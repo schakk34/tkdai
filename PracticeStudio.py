@@ -14,35 +14,79 @@ class PracticeStudio:
         self.rep_duration = rep_duration
         self.rest_duration = rest_duration
 
+        # Initialize MediaPipe with optimized settings
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose()
+        self.pose = self.mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,  # Use medium complexity model
+            smooth_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
 
-        self.video = cv2.VideoCapture(0)
+        # Try multiple camera indices
+        self.video = None
+        for i in range(2):  # Try camera indices 0 and 1
+            self.video = cv2.VideoCapture(i)
+            if self.video.isOpened():
+                print(f"Successfully opened camera {i}")
+                # Set camera properties for better performance
+                self.video.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                self.video.set(cv2.CAP_PROP_FPS, 30)
+                self.video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                break
+            else:
+                print(f"Failed to open camera {i}")
+                if self.video:
+                    self.video.release()
+
+        if self.video is None or not self.video.isOpened():
+            print("Warning: No camera available. Using fallback mode.")
+            self.fallback_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(self.fallback_frame, "No camera access", (50, 240), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
         self.start_time = time.time()
         self.counter = 0
         self.stage = None
         self.ground_truth_angles = None
+        self.last_process_time = 0
+        self.process_interval = 1.0 / 15  # Process every 15 frames
+        self.last_results = None
 
-        if self.movement_type == 0:
+        # Define joint sets for different Taekwondo techniques
+        if self.movement_type == 1:  # Front Kick
+            self.desired_joints = ["HipRight", "KneeRight", "AnkleRight"]
+            self.movement_name = "Front Kick"
+        elif self.movement_type == 2:  # Roundhouse Kick
+            self.desired_joints = ["HipRight", "KneeRight", "AnkleRight"]
+            self.movement_name = "Roundhouse Kick"
+        elif self.movement_type == 3:  # Basic Punches
             self.desired_joints = ["ShoulderRight", "ElbowRight", "WristRight"]
-        if self.movement_type == 1:
-            self.desired_joints = ["ShoulderLeft", "ElbowLeft", "WristLeft"]
-        if self.movement_type == 4:
-            self.desired_joints = ["ShoulderLeft", "ShoulderRight", "ElbowRight"]
-        if self.movement_type == 5:
-            self.desired_joints = ["ShoulderRight", "ShoulderLeft", "ElbowLeft"]
+            self.movement_name = "Basic Punch"
+        elif self.movement_type == 4:  # Poomsae
+            self.desired_joints = ["HipRight", "KneeRight", "AnkleRight", "ShoulderRight", "ElbowRight", "WristRight"]
+            self.movement_name = "Poomsae"
+        else:  # Default to front kick
+            self.desired_joints = ["HipRight", "KneeRight", "AnkleRight"]
+            self.movement_name = "Front Kick"
 
         self.load_and_process_dataset()
 
     def __del__(self):
-        self.video.release()
+        if self.video and self.video.isOpened():
+            self.video.release()
 
     def load_and_process_dataset(self):
         """Loads the dataset, extracts angles, and computes ground truth."""
         dataset = self.load_intellirehab_dataset(self.dataset_path, self.movement_type)
         if not dataset:
-            raise ValueError("Dataset is empty. Check file paths and format.")
+            # If no dataset available, create synthetic data for the movement
+            print("No dataset found, using synthetic data")
+            self.ground_truth_angles = self.create_synthetic_movement_data()
+            return
 
         all_angles = self.extract_joint_angles(dataset)
         self.ground_truth_angles, _ = self.compute_ground_truth_time_series(all_angles)
@@ -120,8 +164,6 @@ class PracticeStudio:
 
     def normalize_time_series(self, data, num_points=100):
         """Resamples a variable-length series to a fixed-length using interpolation."""
-        print("hi", len(data))
-        print(data)
         x_old = np.linspace(0, 1, len(data))
         x_new = np.linspace(0, 1, num_points)
         interpolator = interp1d(x_old, data, kind='linear')
@@ -140,109 +182,201 @@ class PracticeStudio:
 
     def extract_mediapipe_joints(self, landmarks):
         """Extracts required joint coordinates from Mediapipe."""
-        if self.movement_type == 0:
-            indices = [self.mp_pose.PoseLandmark.LEFT_SHOULDER, self.mp_pose.PoseLandmark.LEFT_ELBOW, self.mp_pose.PoseLandmark.LEFT_WRIST]
-        if self.movement_type == 1:
-            indices = [self.mp_pose.PoseLandmark.RIGHT_SHOULDER, self.mp_pose.PoseLandmark.RIGHT_ELBOW, self.mp_pose.PoseLandmark.RIGHT_WRIST]
-        if self.movement_type == 4:
-            indices = [self.mp_pose.PoseLandmark.LEFT_SHOULDER, self.mp_pose.PoseLandmark.RIGHT_SHOULDER, self.mp_pose.PoseLandmark.RIGHT_WRIST]
-        if self.movement_type == 5:
-            indices = [self.mp_pose.PoseLandmark.RIGHT_SHOULDER, self.mp_pose.PoseLandmark.LEFT_SHOULDER, self.mp_pose.PoseLandmark.LEFT_WRIST]
+        joint_mapping = {
+            "HipRight": self.mp_pose.PoseLandmark.RIGHT_HIP,
+            "KneeRight": self.mp_pose.PoseLandmark.RIGHT_KNEE,
+            "AnkleRight": self.mp_pose.PoseLandmark.RIGHT_ANKLE,
+            "HipLeft": self.mp_pose.PoseLandmark.LEFT_HIP,
+            "KneeLeft": self.mp_pose.PoseLandmark.LEFT_KNEE,
+            "AnkleLeft": self.mp_pose.PoseLandmark.LEFT_ANKLE,
+            "ShoulderRight": self.mp_pose.PoseLandmark.RIGHT_SHOULDER,
+            "ElbowRight": self.mp_pose.PoseLandmark.RIGHT_ELBOW,
+            "WristRight": self.mp_pose.PoseLandmark.RIGHT_WRIST,
+            "ShoulderLeft": self.mp_pose.PoseLandmark.LEFT_SHOULDER,
+            "ElbowLeft": self.mp_pose.PoseLandmark.LEFT_ELBOW,
+            "WristLeft": self.mp_pose.PoseLandmark.LEFT_WRIST
+        }
 
         joints = {}
-        for name, idx in zip(self.desired_joints, indices):
-            lm = landmarks.landmark[idx]
-            joints[name] = (lm.x, lm.y, lm.z)
+        for joint_name in self.desired_joints:
+            if joint_name in joint_mapping:
+                lm = landmarks.landmark[joint_mapping[joint_name]]
+                joints[joint_name] = (lm.x, lm.y, lm.z)
 
         return joints
-    
-    def plot_movement_trajectory(self):
-        """Plots the expected movement trajectory for the selected movement type."""
-        if self.ground_truth_angles is None or len(self.ground_truth_angles) == 0:
-            raise ValueError("No ground truth data available for plotting.")
 
-        time_steps = np.linspace(0, 1, len(self.ground_truth_angles))
-
-        plt.figure(figsize=(10, 5))
-        plt.plot(time_steps, self.ground_truth_angles, label="Expected Joint Angle Progression", linewidth=2, color="b")
-        plt.xlabel("Time (seconds)")
-        plt.ylabel("Joint Angle (degrees)")
-
-        # Title based on movement type
-
-        if self.movement_type == 0:
-            movement_name = "Left Arm Curl"
-        if self.movement_type == 1:
-            movement_name = "Right Arm Curl"
-        if self.movement_type == 4:
-            movement_name = "Left Shoulder Abduction"
-        if self.movement_type == 5:
-            movement_name = "Right Shoulder Abduction"
-            
-        plt.title(f"Expected {movement_name} Trajectory")
+    def create_synthetic_movement_data(self):
+        """Creates synthetic movement data for different techniques."""
+        num_points = 100
+        t = np.linspace(0, 1, num_points)
         
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        if self.movement_type == 1:  # Front Kick
+            # Simulate knee lift followed by leg extension
+            angles = np.array([
+                90 + 45 * np.sin(2 * np.pi * t),  # Hip angle
+                90 + 30 * np.sin(2 * np.pi * t),  # Knee angle
+                45 + 30 * np.sin(2 * np.pi * t)   # Ankle angle
+            ])
+            
+        elif self.movement_type == 2:  # Roundhouse Kick
+            # Simulate circular motion
+            angles = np.array([
+                90 + 60 * np.sin(2 * np.pi * t),  # Hip angle
+                90 + 45 * np.sin(2 * np.pi * t),  # Knee angle
+                45 + 45 * np.sin(2 * np.pi * t)   # Ankle angle
+            ])
+            
+        elif self.movement_type == 3:  # Basic Punches
+            # Simulate punch extension and retraction
+            angles = np.array([
+                90 - 45 * np.sin(2 * np.pi * t),  # Shoulder angle
+                90 + 45 * np.sin(2 * np.pi * t),  # Elbow angle
+                0 + 30 * np.sin(2 * np.pi * t)    # Wrist angle
+            ])
+            
+        else:  # Default movement
+            angles = np.array([
+                90 + 30 * np.sin(2 * np.pi * t),  # Joint 1
+                90 + 30 * np.sin(2 * np.pi * t),  # Joint 2
+                45 + 30 * np.sin(2 * np.pi * t)   # Joint 3
+            ])
+        
+        print(f"Created synthetic data with shape: {angles.shape}")
+        return angles  # Shape will be (3, num_points)
 
-    
+    def get_technique_feedback(self, angles, expected_angles):
+        """Provides specific feedback for Taekwondo techniques."""
+        if not isinstance(angles, (list, np.ndarray)) or not isinstance(expected_angles, (list, np.ndarray)):
+            return "Analyzing movement..."
+
+        if len(angles) != len(expected_angles):
+            return "Calibrating..."
+            
+        feedback = ""
+        
+        if self.movement_type == 1:  # Front Kick
+            if angles[0] < expected_angles[0] - 15:
+                feedback = "Lift your knee higher!"
+            elif angles[1] < expected_angles[1] - 15:
+                feedback = "Extend your leg more!"
+            elif abs(angles[0] - expected_angles[0]) <= 15 and abs(angles[1] - expected_angles[1]) <= 15:
+                feedback = "Good form!"
+            else:
+                feedback = "Keep your balance!"
+                
+        elif self.movement_type == 2:  # Roundhouse Kick
+            if angles[0] < expected_angles[0] - 15:
+                feedback = "Pivot your supporting foot!"
+            elif angles[1] < expected_angles[1] - 15:
+                feedback = "Chamber your knee higher!"
+            elif abs(angles[0] - expected_angles[0]) <= 15 and abs(angles[1] - expected_angles[1]) <= 15:
+                feedback = "Excellent rotation!"
+            else:
+                feedback = "Turn your hips more!"
+                
+        elif self.movement_type == 3:  # Basic Punches
+            if angles[0] < expected_angles[0] - 15:
+                feedback = "Rotate your shoulder more!"
+            elif angles[1] < expected_angles[1] - 15:
+                feedback = "Extend your punch!"
+            elif abs(angles[0] - expected_angles[0]) <= 15 and abs(angles[1] - expected_angles[1]) <= 15:
+                feedback = "Good power!"
+            else:
+                feedback = "Keep your guard up!"
+                
+        else:  # Default feedback
+            avg_error = np.mean([abs(a - e) for a, e in zip(angles, expected_angles)])
+            if avg_error > 15:
+                feedback = "Adjust your form!"
+            else:
+                feedback = "Good technique!"
+                
+        return feedback
+
     def get_frame(self):
-        """Processes each frame with real-time feedback (time remaining, movement feedback, speed feedback)."""
+        """Processes each frame with real-time feedback for Taekwondo techniques."""
+        if not hasattr(self, 'video') or not self.video or not self.video.isOpened():
+            ret, jpeg = cv2.imencode('.jpg', self.fallback_frame)
+            return jpeg.tobytes() if ret else None
+
         ret, frame = self.video.read()
         if not ret:
             return None
 
-        elapsed_time = time.time() - self.start_time  # ✅ Now correctly initialized
+        # Flip the frame horizontally for mirror effect
+        frame = cv2.flip(frame, 1)
+        
+        current_time = time.time()
+        should_process = (current_time - self.last_process_time) >= self.process_interval
+
+        if should_process:
+            self.last_process_time = current_time
+            # Process frame for pose detection
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            self.last_results = self.pose.process(frame_rgb)
+        
+        elapsed_time = current_time - self.start_time
         cycle_time = self.rep_duration + self.rest_duration
         cycle_progress = elapsed_time % cycle_time
         is_resting = cycle_progress >= self.rep_duration
 
-        # Initialize variables
-        results = None
-        remaining_time_display = ""
-        movement_feedback = ""
-        speed_feedback = ""
-
         # Timer Display
         if is_resting:
             remaining_time_display = f"Rest... {max(0, self.rest_duration - (cycle_progress - self.rep_duration)):.1f}s"
+            technique_feedback = "Prepare for next technique"
+            form_feedback = ""
         else:
-            rep_progress = cycle_progress / self.rep_duration
-            expected_angle = np.interp(rep_progress, np.linspace(0, 1, len(self.ground_truth_angles)), self.ground_truth_angles)
             remaining_time_display = f"Timer: {max(0, self.rep_duration - cycle_progress):.1f}s"
-            movement_feedback = "Raise Your Arm!" if cycle_progress < self.rep_duration / 2 else "Lower Your Arm!"
-            speed_feedback = ""
-
-            # ✅ Ensure `results` is always defined
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.pose.process(image)
-
-            if results and results.pose_landmarks:
-                joints = self.extract_mediapipe_joints(results.pose_landmarks)
+            technique_feedback = ""
+            form_feedback = ""
+            
+            if self.last_results and self.last_results.pose_landmarks:
+                rep_progress = cycle_progress / self.rep_duration
+                # Get the expected angles for the current time
+                if isinstance(self.ground_truth_angles, np.ndarray) and self.ground_truth_angles.ndim == 2:
+                    num_angles = self.ground_truth_angles.shape[0]
+                    time_points = np.linspace(0, 1, self.ground_truth_angles.shape[1])
+                    expected_angles = [
+                        float(np.interp(rep_progress, time_points, self.ground_truth_angles[i]))
+                        for i in range(num_angles)
+                    ]
+                else:
+                    expected_angles = [90.0] * 3  # Default angles if no ground truth available
+                
+                joints = self.extract_mediapipe_joints(self.last_results.pose_landmarks)
                 if all(j in joints for j in self.desired_joints):
-                    raw_angle = self.compute_angle(*[joints[joint] for joint in self.desired_joints])
-                    normalized_angle = self.normalize_angle(raw_angle)
+                    current_angles = []
+                    for i in range(0, len(self.desired_joints)-2, 3):
+                        angle = self.compute_angle(
+                            joints[self.desired_joints[i]],
+                            joints[self.desired_joints[i+1]],
+                            joints[self.desired_joints[i+2]]
+                        )
+                        current_angles.append(self.normalize_angle(angle))
+                    
+                    technique_feedback = self.get_technique_feedback(current_angles, expected_angles)
+                    score = 100 - min(100, sum([abs(a - b) for a, b in zip(current_angles, expected_angles)]))
+                    form_feedback = f"Form Score: {max(0, score):.0f}%"
 
-                    # Speed feedback
-                    if abs(normalized_angle - expected_angle) > 15:
-                        speed_feedback = "Slow Down!" if raw_angle > expected_angle else "Speed Up!"
-                    else:
-                        speed_feedback = "Good Form!"
+        # Add overlays
+        cv2.putText(frame, f"{self.movement_name} Practice", (30, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(frame, remaining_time_display, (30, 70), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        if technique_feedback:
+            cv2.putText(frame, technique_feedback, (30, 110), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        if form_feedback:
+            cv2.putText(frame, form_feedback, (30, 150), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
-        # Convert the frame to RGB and overlay the feedback
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        cv2.putText(frame, remaining_time_display, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.putText(frame, movement_feedback, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, speed_feedback, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        # Draw pose landmarks only if we processed this frame
+        if should_process and self.last_results and self.last_results.pose_landmarks:
+            self.mp_drawing.draw_landmarks(frame, self.last_results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
 
-        if results and results.pose_landmarks:
-            self.mp_drawing.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
-
-        # Encode the processed frame in JPEG format and return
-
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # Encode and return the frame
         ret, jpeg = cv2.imencode('.jpg', frame)
-        return jpeg.tobytes()
+        return jpeg.tobytes() if ret else None
 
 # Usage
 if __name__ == "__main__":

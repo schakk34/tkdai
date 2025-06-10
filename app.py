@@ -1,117 +1,197 @@
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, session
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 from capture import Capture
 from PracticeStudio import PracticeStudio
+from functools import wraps
+import os
+from datetime import datetime
+import cv2
 
 app = Flask(__name__)
-camera = Capture(0)
-practice_camera = PracticeStudio(0)
+app.config['SECRET_KEY'] = os.urandom(24)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkd.db'
+db = SQLAlchemy(app)
 
-def generate_frames(camera):
+# User model for authentication
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    belt_rank = db.Column(db.String(20), default='White Belt')
+    progress = db.relationship('Progress', backref='user', lazy=True)
+
+# Progress tracking model
+class Progress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    technique = db.Column(db.String(50), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.DateTime, nullable=False)
+
+camera = None
+practice_studio = None
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def init_camera():
+    global camera, practice_studio
+    if camera is None:
+        try:
+            camera = Capture(0)
+            practice_studio = PracticeStudio(movement_type=1)  # Initialize with Front Kick
+        except Exception as e:
+            print(f"Error initializing camera: {e}")
+            return False
+    return True
+
+def generate_frames():
+    if not init_camera():
+        return
+
     while True:
         frame = camera.get_frame()
         if frame is None:
-            break
+            continue
+            
+        # Process frame with PracticeStudio
+        frame = cv2.flip(frame, 1)  # Mirror effect
+        if practice_studio:
+            # Convert frame to RGB for MediaPipe
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = practice_studio.pose.process(frame_rgb)
+            
+            if results.pose_landmarks:
+                # Draw the pose landmarks
+                frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                practice_studio.mp_drawing.draw_landmarks(
+                    frame_rgb,
+                    results.pose_landmarks,
+                    practice_studio.mp_pose.POSE_CONNECTIONS
+                )
+                frame = frame_rgb
+
+        # Encode frame
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            continue
+            
+        frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 @app.route('/')
 def landing():
     return render_template('landing.html')
 
-@app.route('/kneadpizza')
-def knead():
-    global camera
-    camera = Capture(2)
-    return render_template('knead.html')
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = User.query.filter_by(username=request.form['username']).first()
+        if user and check_password_hash(user.password_hash, request.form['password']):
+            session['user_id'] = user.id
+            return redirect(url_for('dashboard'))
+        flash('Invalid username or password')
+    return render_template('login.html')
 
-@app.route('/tosspizza')
-def toss():
-    global camera
-    camera = Capture(1)
-    return render_template('toss.html')
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        hashed_password = generate_password_hash(request.form['password'])
+        new_user = User(
+            username=request.form['username'],
+            email=request.form['email'],
+            password_hash=hashed_password
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template('signup.html')
 
-@app.route('/saucepizza')
-def sauce():
-    global camera
-    camera = Capture(3)
-    return render_template('sauce.html')
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('landing'))
 
-@app.route('/cheesepizza')
-def cheese():
-    global camera
-    camera = Capture(0)
-    return render_template('cheese.html')
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user = User.query.get(session['user_id'])
+    return render_template('dashboard.html', user=user)
 
-@app.route('/toppizza')
-def toppings():
-    global camera
-    camera = Capture(5)
-    return render_template('toppings.html')
+@app.route('/practice')
+@login_required
+def practice():
+    return render_template('practice.html')
 
-@app.route('/cookpizza')
-def oven():
-    global camera
-    camera = Capture(6)
-    return render_template('oven.html')
+@app.route('/front-kick')
+@login_required
+def front_kick():
+    global practice_studio
+    practice_studio = PracticeStudio(1)
+    return render_template('front_kick.html')
 
-@app.route('/cutpizza')
-def cut():
-    global camera
-    camera = Capture(4)
-    return render_template('cut.html')
+@app.route('/roundhouse-kick')
+@login_required
+def roundhouse_kick():
+    global practice_studio
+    practice_studio = PracticeStudio(2)
+    return render_template('roundhouse_kick.html')
 
-@app.route('/eatpizza')
-def eat():
-    global camera
-    camera = Capture(1)
-    return render_template('eat.html')
+@app.route('/basic-punches')
+@login_required
+def basic_punches():
+    global practice_studio
+    practice_studio = PracticeStudio(3)
+    return render_template('basic_punches.html')
 
-@app.route('/pizzagame')
-def pizzastart():
-    return render_template('pizzastart.html')
+@app.route('/poomsae')
+@login_required
+def poomsae():
+    global practice_studio
+    practice_studio = PracticeStudio(4)
+    return render_template('poomsae.html')
 
-@app.route('/data')
-def data():
-    return render_template('data.html')
-
-
-@app.route('/design')
-def design():
-    return render_template('design.html')
+@app.route('/progress')
+@login_required
+def progress():
+    user = User.query.get(session['user_id'])
+    progress_data = Progress.query.filter_by(user_id=user.id).all()
+    return render_template('progress.html', progress=progress_data)
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(camera),
+    return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/reset_counter')
-def reset_counter():
-    camera.counter = 0  # Reset the counter
-    return jsonify(success=True)
-
-@app.route('/counter')
-def get_counter():
-    return jsonify(counter=camera.counter)
-
-@app.route('/practicestudio')
-def practicestudio():
-    return render_template('practicestudio.html')
-
-@app.route('/leftcurl')
-def leftcurl():
-    return render_template('/leftcurl.html')
-
-@app.route('/rightcurl')
-def rightcurl():
-    global practice_camera
-    practice_camera = PracticeStudio(1)
-    return render_template('/rightcurl.html')
-
 
 @app.route('/practice_video_feed')
 def practice_video_feed():
-    return Response(generate_frames(practice_camera),
+    return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/save_progress', methods=['POST'])
+@login_required
+def save_progress():
+    data = request.get_json()
+    new_progress = Progress(
+        user_id=session['user_id'],
+        technique=data['technique'],
+        score=data['score'],
+        date=datetime.now()
+    )
+    db.session.add(new_progress)
+    db.session.commit()
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    with app.app_context():
+        db.create_all()
+    app.run(debug=True, port=5002)
