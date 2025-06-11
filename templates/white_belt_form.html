@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}White Belt Form Practice{% endblock %}
+
+{% block extra_css %}
+<style>
+.camera-container {
+    position: relative;
+    width: 100%;
+    height: 0;
+    padding-bottom: 75%; /* 4:3 Aspect Ratio */
+    overflow: hidden;
+    background-color: #000;
+}
+
+.camera-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
+.pose-controls {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.pose-feedback {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+}
+
+.pose-confirmed {
+    background-color: rgba(40, 167, 69, 0.7) !important;
+}
+
+.current-pose {
+    font-weight: bold;
+    color: #28a745;
+}
+
+.completed-pose {
+    color: #28a745;
+    text-decoration: line-through;
+}
+
+.future-pose {
+    color: #6c757d;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3>White Belt Form (Taegeuk Il Jang) Practice</h3>
+                </div>
+                <div class="card-body">
+                    <div class="camera-container">
+                        <img id="videoFeed" src="{{ url_for('practice_video_feed') }}" class="img-fluid">
+                    </div>
+                    <div class="pose-feedback" id="poseFeedback">
+                        <h4>Current Pose: <span id="currentPoseName">Loading...</span></h4>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="pose-controls">
+                        <button id="nextPose" class="btn btn-success btn-lg" disabled>
+                            Next Pose <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4>Form Instructions</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Taegeuk Il Jang Steps:</h5>
+                    <ol class="list-group list-group-numbered" id="poseList">
+                        <li class="list-group-item">Start in Ready Stance (Junbi)</li>
+                        <li class="list-group-item">Low Block (Arae Makki)</li>
+                        <li class="list-group-item">Front Punch (Momtong Jireugi)</li>
+                        <li class="list-group-item">Walking Stance (Ap Seogi)</li>
+                        <li class="list-group-item">Middle Block (Momtong Makki)</li>
+                        <li class="list-group-item">Front Kick (Ap Chagi)</li>
+                        <li class="list-group-item">Return to Ready Stance</li>
+                    </ol>
+                    <div class="mt-3">
+                        <h5>Tips:</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item">Keep your stances strong</li>
+                            <li class="list-group-item">Maintain good balance</li>
+                            <li class="list-group-item">Focus on precision</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nextPoseButton = document.getElementById('nextPose');
+    const poseFeedback = document.getElementById('poseFeedback');
+    const currentPoseName = document.getElementById('currentPoseName');
+    const poseList = document.getElementById('poseList');
+    let poseConfirmed = false;
+
+    // Function to update the pose list UI
+    function updatePoseList(currentPose) {
+        const poseNumber = parseInt(currentPose.replace('white', ''));
+        const items = poseList.getElementsByTagName('li');
+        
+        for (let i = 0; i < items.length; i++) {
+            if (i < poseNumber) {
+                items[i].classList.add('completed-pose');
+            } else if (i === poseNumber) {
+                items[i].classList.add('current-pose');
+                items[i].classList.remove('completed-pose', 'future-pose');
+            } else {
+                items[i].classList.add('future-pose');
+                items[i].classList.remove('completed-pose', 'current-pose');
+            }
+        }
+    }
+
+    // Function to handle pose confirmation
+    function handlePoseConfirmation() {
+        if (!poseConfirmed) {
+            poseConfirmed = true;
+            nextPoseButton.disabled = false;
+            poseFeedback.classList.add('pose-confirmed');
+        }
+    }
+
+    // Function to move to next pose
+    nextPoseButton.addEventListener('click', function() {
+        fetch('/next_pose', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                poseConfirmed = false;
+                nextPoseButton.disabled = true;
+                poseFeedback.classList.remove('pose-confirmed');
+                currentPoseName.textContent = data.current_pose;
+                updatePoseList(data.current_pose);
+                
+                if (data.completed) {
+                    // Handle form completion
+                    alert('Congratulations! You have completed the White Belt Form!');
+                    // Save progress
+                    fetch('/save_progress', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            technique: 'White Belt Form',
+                            score: 100,
+                            duration: 0
+                        })
+                    });
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    // Watch for pose confirmation messages
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                const node = mutation.target;
+                if (node.textContent.includes('POSE CONFIRMED!')) {
+                    handlePoseConfirmation();
+                }
+            }
+        });
+    });
+
+    observer.observe(poseFeedback, { childList: true, subtree: true });
+});
+</script>
+{% endblock %} 

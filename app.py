@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from capture import Capture
 from PracticeStudio import PracticeStudio
+from white_belt_form import WhiteBeltForm
 from functools import wraps
 import os
 from datetime import datetime
@@ -32,6 +33,7 @@ class Progress(db.Model):
 
 camera = None
 practice_studio = None
+white_belt_form = None
 
 # Login required decorator
 def login_required(f):
@@ -62,15 +64,18 @@ def generate_frames():
         if frame is None:
             continue
             
-        # Process frame with PracticeStudio
+        # Process frame with PracticeStudio or WhiteBeltForm
         frame = cv2.flip(frame, 1)  # Mirror effect
-        if practice_studio:
-            # Convert frame to RGB for MediaPipe
+        
+        if white_belt_form:
+            # Use WhiteBeltForm processing
+            frame = white_belt_form.process_frame(frame)
+        elif practice_studio:
+            # Use PracticeStudio processing
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = practice_studio.pose.process(frame_rgb)
             
             if results.pose_landmarks:
-                # Draw the pose landmarks
                 frame_rgb = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
                 practice_studio.mp_drawing.draw_landmarks(
                     frame_rgb,
@@ -160,6 +165,14 @@ def poomsae():
     practice_studio = PracticeStudio(4)
     return render_template('poomsae.html')
 
+@app.route('/white-belt-form')
+@login_required
+def white_belt_form_route():
+    global white_belt_form, practice_studio
+    practice_studio = None  # Disable practice studio
+    white_belt_form = WhiteBeltForm()  # Initialize white belt form
+    return render_template('white_belt_form.html')
+
 @app.route('/progress')
 @login_required
 def progress():
@@ -190,6 +203,18 @@ def save_progress():
     db.session.add(new_progress)
     db.session.commit()
     return jsonify({'success': True})
+
+@app.route('/next_pose', methods=['POST'])
+@login_required
+def next_pose():
+    if white_belt_form and white_belt_form.pose_confirmed:
+        success = white_belt_form.next_pose()
+        return jsonify({
+            'success': success,
+            'completed': white_belt_form.is_form_completed(),
+            'current_pose': white_belt_form.get_current_pose_name()
+        })
+    return jsonify({'success': False, 'error': 'Current pose not confirmed yet'})
 
 if __name__ == '__main__':
     with app.app_context():
