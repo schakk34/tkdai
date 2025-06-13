@@ -137,6 +137,12 @@ def dashboard():
 def practice():
     return render_template('practice.html')
 
+@app.route('/rhythm')
+@login_required
+def rhythm():
+    user = User.query.get(session['user_id'])
+    return render_template('rhythm.html')
+
 @app.route('/front-kick')
 @login_required
 def front_kick():
