@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rhythm Tool - TKD AI</title>
+    <title>Rhythm - TKD AI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -28,7 +28,8 @@
             width: 4px;
             height: 100%;
             background-color: #dc3545;
-            cursor: pointer;
+            cursor: move;
+            user-select: none;
         }
         .rhythm-marker::after {
             content: '';
@@ -39,6 +40,52 @@
             height: 10px;
             background-color: #dc3545;
             border-radius: 50%;
+        }
+        .playback-indicator {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background-color: #28a745;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        .marker-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 1rem;
+        }
+        .marker-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .marker-item:last-child {
+            border-bottom: none;
+        }
+        .marker-time {
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+        .countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 8rem;
+            font-weight: bold;
+            color: #dc3545;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        .duration-control {
+            width: 200px;
         }
         .preset-card {
             transition: transform 0.3s;
@@ -105,13 +152,36 @@
                         </button>
                     </div>
                 </div>
-                <div class="col-md-6 text-end">
-                    <span class="time-display">Duration: <span id="duration">0.0</span>s</span>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-end align-items-center gap-3">
+                        <div class="form-group">
+                            <label for="durationSlider" class="form-label">Duration (seconds)</label>
+                            <input type="range" class="form-range duration-control" id="durationSlider" 
+                                   min="5" max="120" value="10" step="1">
+                        </div>
+                        <span class="time-display">Duration: <span id="duration">0:00.000</span></span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Rhythm Timeline -->
-            <div id="rhythmTimeline" class="rhythm-timeline"></div>
+            <div class="row">
+                <div class="col-md-8">
+                    <!-- Rhythm Timeline -->
+                    <div id="rhythmTimeline" class="rhythm-timeline">
+                        <div id="playbackIndicator" class="playback-indicator"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <!-- Marker List -->
+                    <div class="marker-list">
+                        <h5 class="mb-3">Markers</h5>
+                        <div id="markerList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Countdown Display -->
+            <div id="countdown" class="countdown">3</div>
 
             <!-- Preset Templates -->
             <h3 class="mt-5 mb-4">Preset Templates</h3>
@@ -170,12 +240,102 @@
             oscillator.stop(audioContext.currentTime + 0.1);
         }
 
-        // Add marker to timeline
+        // Format time as MM:SS.mmm
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const milliseconds = Math.floor((remainingSeconds % 1) * 1000);
+            return `${minutes}:${Math.floor(remainingSeconds).toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+        }
+
+        // Update marker list
+        function updateMarkerList() {
+            const markerList = document.getElementById('markerList');
+            markerList.innerHTML = '';
+            
+            const sortedMarkers = [...markers].sort((a, b) => 
+                parseFloat(a.dataset.time) - parseFloat(b.dataset.time)
+            );
+            
+            sortedMarkers.forEach((marker, index) => {
+                const time = parseFloat(marker.dataset.time);
+                const item = document.createElement('div');
+                item.className = 'marker-item';
+                item.innerHTML = `
+                    <span>Marker ${index + 1}</span>
+                    <span class="marker-time">${formatTime(time)}</span>
+                `;
+                markerList.appendChild(item);
+            });
+        }
+
+        // Make markers draggable
+        function makeMarkerDraggable(marker) {
+            let isDragging = false;
+            let startX;
+            let startLeft;
+
+            marker.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startLeft = parseFloat(marker.style.left);
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const timeline = document.getElementById('rhythmTimeline');
+                const rect = timeline.getBoundingClientRect();
+                const deltaX = e.clientX - startX;
+                let newLeft = startLeft + deltaX;
+                
+                // Constrain to timeline bounds
+                newLeft = Math.max(0, Math.min(newLeft, rect.width));
+                
+                marker.style.left = `${newLeft}px`;
+                const maxDuration = parseFloat(document.getElementById('durationSlider').value);
+                const time = (newLeft / rect.width) * maxDuration;
+                marker.dataset.time = time;
+                
+                updateMarkerList();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    updateDuration();
+                }
+            });
+        }
+
+        // Countdown function
+        function startCountdown(callback) {
+            const countdown = document.getElementById('countdown');
+            let count = 3;
+            
+            countdown.style.display = 'block';
+            countdown.textContent = count;
+            
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdown.textContent = count;
+                } else {
+                    clearInterval(interval);
+                    countdown.style.display = 'none';
+                    callback();
+                }
+            }, 1000);
+        }
+
+        // Modified addMarker function
         function addMarker(event) {
             const timeline = document.getElementById('rhythmTimeline');
             const rect = timeline.getBoundingClientRect();
             const x = event.clientX - rect.left;
-            const time = (x / rect.width) * 10; // 10 seconds max duration
+            const maxDuration = parseFloat(document.getElementById('durationSlider').value);
+            const time = (x / rect.width) * maxDuration;
             
             const marker = document.createElement('div');
             marker.className = 'rhythm-marker';
@@ -187,71 +347,104 @@
                 marker.remove();
                 markers = markers.filter(m => m !== marker);
                 updateDuration();
+                updateMarkerList();
             });
             
+            makeMarkerDraggable(marker);
             timeline.appendChild(marker);
             markers.push(marker);
             updateDuration();
+            updateMarkerList();
         }
 
-        // Update duration display
-        function updateDuration() {
-            const maxTime = Math.max(...markers.map(m => parseFloat(m.dataset.time)), 0);
-            document.getElementById('duration').textContent = maxTime.toFixed(1);
-        }
-
-        // Play rhythm
+        // Modified playRhythm function
         function playRhythm() {
             if (isPlaying) return;
-            isPlaying = true;
             
-            const sortedMarkers = [...markers].sort((a, b) => 
-                parseFloat(a.dataset.time) - parseFloat(b.dataset.time)
-            );
-            
-            let currentIndex = 0;
-            const startTime = audioContext.currentTime;
-            
-            function playNext() {
-                if (currentIndex >= sortedMarkers.length) {
-                    currentIndex = 0;
+            startCountdown(() => {
+                isPlaying = true;
+                const sortedMarkers = [...markers].sort((a, b) => 
+                    parseFloat(a.dataset.time) - parseFloat(b.dataset.time)
+                );
+                
+                let currentIndex = 0;
+                const startTime = audioContext.currentTime;
+                const maxDuration = parseFloat(document.getElementById('durationSlider').value);
+                
+                function updatePlaybackIndicator(time) {
+                    const timeline = document.getElementById('rhythmTimeline');
+                    const indicator = document.getElementById('playbackIndicator');
+                    const position = (time % maxDuration) / maxDuration * timeline.offsetWidth;
+                    indicator.style.left = `${position}px`;
                 }
                 
-                const marker = sortedMarkers[currentIndex];
-                const time = parseFloat(marker.dataset.time);
-                
-                createClickSound();
-                currentIndex++;
-                
-                if (isPlaying) {
-                    const nextTime = currentIndex < sortedMarkers.length ? 
-                        parseFloat(sortedMarkers[currentIndex].dataset.time) - time : 
-                        10 - time;
+                function playNext() {
+                    if (currentIndex >= sortedMarkers.length) {
+                        currentIndex = 0;
+                    }
                     
-                    playInterval = setTimeout(playNext, nextTime * 1000);
+                    const marker = sortedMarkers[currentIndex];
+                    const time = parseFloat(marker.dataset.time);
+                    
+                    createClickSound();
+                    currentIndex++;
+                    
+                    if (isPlaying) {
+                        const nextTime = currentIndex < sortedMarkers.length ? 
+                            parseFloat(sortedMarkers[currentIndex].dataset.time) - time : 
+                            maxDuration - time;
+                        
+                        const currentTime = (audioContext.currentTime - startTime) % maxDuration;
+                        updatePlaybackIndicator(currentTime);
+                        
+                        // Update playback indicator continuously
+                        const updateInterval = setInterval(() => {
+                            if (!isPlaying) {
+                                clearInterval(updateInterval);
+                                return;
+                            }
+                            const currentTime = (audioContext.currentTime - startTime) % maxDuration;
+                            updatePlaybackIndicator(currentTime);
+                        }, 16); // Update at ~60fps
+                        
+                        playInterval = setTimeout(() => {
+                            clearInterval(updateInterval);
+                            playNext();
+                        }, nextTime * 1000);
+                    }
                 }
-            }
+                
+                playNext();
+            });
+        }
+
+        // Modified updateDuration function
+        function updateDuration() {
+            const maxTime = Math.max(...markers.map(m => parseFloat(m.dataset.time)), 0);
+            document.getElementById('duration').textContent = formatTime(maxTime);
+        }
+
+        // Duration slider event listener
+        document.getElementById('durationSlider').addEventListener('input', (e) => {
+            const maxDuration = parseFloat(e.target.value);
+            const timeline = document.getElementById('rhythmTimeline');
             
-            playNext();
-        }
-
-        // Stop rhythm
-        function stopRhythm() {
-            isPlaying = false;
-            clearTimeout(playInterval);
-        }
-
-        // Clear all markers
-        function clearMarkers() {
-            markers.forEach(marker => marker.remove());
-            markers = [];
+            // Update marker positions based on their time values
+            markers.forEach(marker => {
+                const time = parseFloat(marker.dataset.time);
+                const newPosition = (time / maxDuration) * timeline.offsetWidth;
+                marker.style.left = `${newPosition}px`;
+            });
+            
             updateDuration();
-        }
+            updateMarkerList();
+        });
 
-        // Load preset patterns
+        // Modified loadPreset function
         function loadPreset(preset) {
             clearMarkers();
             const timeline = document.getElementById('rhythmTimeline');
+            const maxDuration = parseFloat(document.getElementById('durationSlider').value);
             
             let times;
             switch(preset) {
@@ -269,7 +462,7 @@
             times.forEach(time => {
                 const marker = document.createElement('div');
                 marker.className = 'rhythm-marker';
-                marker.style.left = `${(time / 10) * timeline.offsetWidth}px`;
+                marker.style.left = `${(time / maxDuration) * timeline.offsetWidth}px`;
                 marker.dataset.time = time;
                 
                 marker.addEventListener('click', (e) => {
@@ -277,13 +470,32 @@
                     marker.remove();
                     markers = markers.filter(m => m !== marker);
                     updateDuration();
+                    updateMarkerList();
                 });
                 
+                makeMarkerDraggable(marker);
                 timeline.appendChild(marker);
                 markers.push(marker);
             });
             
             updateDuration();
+            updateMarkerList();
+        }
+
+        // Modified stopRhythm function
+        function stopRhythm() {
+            isPlaying = false;
+            clearTimeout(playInterval);
+            const indicator = document.getElementById('playbackIndicator');
+            indicator.style.left = '0px';
+        }
+
+        // Clear all markers
+        function clearMarkers() {
+            markers.forEach(marker => marker.remove());
+            markers = [];
+            updateDuration();
+            updateMarkerList();
         }
 
         // Event listeners
