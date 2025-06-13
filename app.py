@@ -141,7 +141,7 @@ def practice():
 @login_required
 def rhythm():
     user = User.query.get(session['user_id'])
-    return render_template('rhythm.html')
+    return render_template('rhythm.html', user=user)
 
 @app.route('/front-kick')
 @login_required

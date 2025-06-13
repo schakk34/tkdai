@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice Studio - TKD AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+        .video-feed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .feedback-panel {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .score-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .technique-tips {
+            background: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .control-btn {
+            width: 120px;
+            height: 45px;
+            font-weight: 600;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-active {
+            background-color: #28a745;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">TKD AI</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/practice">Practice Studio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/progress">Progress</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Video Feed -->
+                <div class="video-container mb-4">
+                    <img src="{{ url_for('practice_video_feed') }}" class="video-feed" alt="Practice Studio Feed">
+                </div>
+
+                <!-- Controls -->
+                <div class="d-flex justify-content-center gap-3 mb-4">
+                    <button class="btn btn-danger control-btn" onclick="startPractice()" id="startBtn">
+                        <i class="fas fa-play me-2"></i>Start
+                    </button>
+                    <button class="btn btn-outline-danger control-btn" onclick="resetPractice()" id="resetBtn">
+                        <i class="fas fa-redo me-2"></i>Reset
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Status -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <span class="status-indicator" id="statusDot"></span>
+                            Status: <span id="statusText">Ready</span>
+                        </h5>
+                    </div>
+                </div>
+
+                <!-- Real-time Feedback -->
+                <div class="feedback-panel">
+                    <h4>Real-time Feedback</h4>
+                    <div class="score-display mb-3">
+                        Score: <span id="currentScore">0</span>%
+                    </div>
+                    <div id="feedbackText" class="mb-3">
+                        Ready to start practice...
+                    </div>
+                </div>
+
+                <!-- Technique Tips -->
+                <div class="technique-tips">
+                    <h5>Technique Tips</h5>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i>Keep your base foot planted</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Maintain proper balance</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Follow through with the motion</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Return to starting position</li>
+                    </ul>
+                </div>
+
+                <!-- Progress Summary -->
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Session Summary</h5>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Attempts:</span>
+                            <span id="attempts">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Best Score:</span>
+                            <span id="bestScore">0%</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Practice Time:</span>
+                            <span id="practiceTime">0:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let practiceTimer;
+        let seconds = 0;
+        let attempts = 0;
+        let bestScore = 0;
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        function startPractice() {
+            // Reset counters
+            seconds = 0;
+            clearInterval(practiceTimer);
+            
+            // Start timer
+            practiceTimer = setInterval(() => {
+                seconds++;
+                updatePracticeTime();
+            }, 1000);
+
+            // Update UI
+            document.getElementById('feedbackText').textContent = "Practice in progress...";
+            attempts++;
+            document.getElementById('attempts').textContent = attempts;
+            
+            // Update status
+            statusDot.classList.add('status-active');
+            statusText.textContent = "Active";
+            
+            // Update button states
+            document.getElementById('startBtn').disabled = true;
+            
+            // Simulate score updates
+            simulateScoreUpdates();
+        }
+
+        function resetPractice() {
+            clearInterval(practiceTimer);
+            seconds = 0;
+            document.getElementById('currentScore').textContent = "0";
+            document.getElementById('feedbackText').textContent = "Ready to start practice...";
+            updatePracticeTime();
+            
+            // Reset status
+            statusDot.classList.remove('status-active');
+            statusText.textContent = "Ready";
+            
+            // Reset button states
+            document.getElementById('startBtn').disabled = false;
+        }
+
+        function updatePracticeTime() {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            document.getElementById('practiceTime').textContent = 
+                `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function simulateScoreUpdates() {
+            let score = 0;
+            const scoreInterval = setInterval(() => {
+                score = Math.min(score + Math.random() * 10, 100);
+                const roundedScore = Math.round(score);
+                document.getElementById('currentScore').textContent = roundedScore;
+                
+                if (roundedScore > bestScore) {
+                    bestScore = roundedScore;
+                    document.getElementById('bestScore').textContent = bestScore + "%";
+                }
+
+                if (score >= 100) {
+                    clearInterval(scoreInterval);
+                    document.getElementById('feedbackText').textContent = "Excellent form!";
+                    resetPractice();
+                }
+            }, 500);
+        }
+    </script>
+</body>
+</html> 
