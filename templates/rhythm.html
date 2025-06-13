@@ -140,28 +140,31 @@
         <div class="rhythm-container">
             <h2 class="mb-4">Rhythm</h2>
             
-            <!-- Controls -->
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="d-flex gap-3">
-                        <button id="playBtn" class="btn btn-danger control-btn">
-                            <i class="fas fa-play me-2"></i>Play
-                        </button>
-                        <button id="stopBtn" class="btn btn-outline-danger control-btn">
-                            <i class="fas fa-stop me-2"></i>Stop
-                        </button>
-                        <button id="clearBtn" class="btn btn-outline-danger control-btn">
-                            <i class="fas fa-trash me-2"></i>Clear
-                        </button>
-                    </div>
+            <!-- Button Controls -->
+            <div class="row mb-3">
+                <div class="col d-flex gap-3">
+                    <button id="playBtn" class="btn btn-danger control-btn">
+                        <i class="fas fa-play me-2"></i>Play
+                    </button>
+                    <button id="stopBtn" class="btn btn-outline-danger control-btn">
+                        <i class="fas fa-stop me-2"></i>Stop
+                    </button>
                 </div>
-                <div class="col-md-6">
-                    <div class="d-flex justify-content-end align-items-center gap-3">
-                        <div class="form-group">
-                            <label for="durationSlider" class="form-label">Duration (seconds)</label>
-                            <input type="range" class="form-range duration-control" id="durationSlider" 
-                                   min="5" max="120" value="10" step="1">
-                        </div>
+                <div class="col d-flex justify-content-end">
+                    <button id="clearBtn" class="btn btn-outline-danger control-btn">
+                        <i class="fas fa-trash me-2"></i>Clear
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Duration Controls Below Buttons -->
+            <div class="row mb-4">
+                <div class="col d-flex align-items-center gap-4">
+                    <div class="form-group w-50">
+                        <label for="durationSlider" class="form-label">Duration (seconds)</label>
+                        <input type="range" class="form-range" id="durationSlider" min="5" max="120" value="10" step="1">
+                    </div>
+                    <div>
                         <span class="time-display">Duration: <span id="duration">0:00.000</span></span>
                     </div>
                 </div>
@@ -226,6 +229,7 @@
         let markers = [];
         let isPlaying = false;
         let playInterval;
+        let suppressNextClick = false;
 
         // Create click sound
         function createClickSound() {
@@ -273,45 +277,90 @@
         }
 
         // Make markers draggable
-        function makeMarkerDraggable(marker) {
+        function markerAction(marker) {
             let isDragging = false;
             let startX;
             let startLeft;
+            let hasMoved = false;
 
-            marker.addEventListener('mousedown', (e) => {
+            const onMouseDown = (e) => {
                 isDragging = true;
+                hasMoved = false;
                 startX = e.clientX;
-                startLeft = parseFloat(marker.style.left);
+                startLeft = parseFloat(marker.style.left) || 0;
                 e.stopPropagation();
-            });
+            };
 
-            document.addEventListener('mousemove', (e) => {
+            const onMouseMove = (e) => {
                 if (!isDragging) return;
-                
+
+                const deltaX = e.clientX - startX;
+                if (Math.abs(deltaX) > 3) hasMoved = true; // movement threshold to detect dragging
+
                 const timeline = document.getElementById('rhythmTimeline');
                 const rect = timeline.getBoundingClientRect();
-                const deltaX = e.clientX - startX;
                 let newLeft = startLeft + deltaX;
-                
+
                 // Constrain to timeline bounds
                 newLeft = Math.max(0, Math.min(newLeft, rect.width));
-                
                 marker.style.left = `${newLeft}px`;
+
                 const maxDuration = parseFloat(document.getElementById('durationSlider').value);
                 const time = (newLeft / rect.width) * maxDuration;
                 marker.dataset.time = time;
-                
-                updateMarkerList();
-            });
 
-            document.addEventListener('mouseup', () => {
+                updateMarkerList();
+            };
+
+            const onMouseUp = () => {
                 if (isDragging) {
                     isDragging = false;
+                    if (hasMoved) suppressNextClick = true;
                     updateDuration();
+                }
+            };
+
+            marker.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            // Click handler to delete only if not dragged
+            marker.addEventListener('click', (e) => {
+                if (!hasMoved) {
+                    e.stopPropagation();
+                    marker.remove();
+                    markers = markers.filter(m => m !== marker);
+                    updateDuration();
+                    updateMarkerList();
                 }
             });
         }
 
+        
+        // Modified addMarker function
+        function addMarker(event) {
+            if (suppressNextClick) {
+                suppressNextClick = false; // reset for future clicks
+                return;
+            }   
+            const timeline = document.getElementById('rhythmTimeline');
+            const rect = timeline.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const maxDuration = parseFloat(document.getElementById('durationSlider').value);
+            const time = (x / rect.width) * maxDuration;
+            
+            const marker = document.createElement('div');
+            marker.className = 'rhythm-marker';
+            marker.style.left = `${x}px`;
+            marker.dataset.time = time;
+            
+            markerAction(marker);
+            timeline.appendChild(marker);
+            markers.push(marker);
+            updateDuration();
+            updateMarkerList();
+        }
+        
         // Countdown function
         function startCountdown(callback) {
             const countdown = document.getElementById('countdown');
@@ -331,38 +380,10 @@
                 }
             }, 1000);
         }
-
-        // Modified addMarker function
-        function addMarker(event) {
-            const timeline = document.getElementById('rhythmTimeline');
-            const rect = timeline.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const maxDuration = parseFloat(document.getElementById('durationSlider').value);
-            const time = (x / rect.width) * maxDuration;
-            
-            const marker = document.createElement('div');
-            marker.className = 'rhythm-marker';
-            marker.style.left = `${x}px`;
-            marker.dataset.time = time;
-            
-            marker.addEventListener('click', (e) => {
-                e.stopPropagation();
-                marker.remove();
-                markers = markers.filter(m => m !== marker);
-                updateDuration();
-                updateMarkerList();
-            });
-            
-            makeMarkerDraggable(marker);
-            timeline.appendChild(marker);
-            markers.push(marker);
-            updateDuration();
-            updateMarkerList();
-        }
-
+        
         // Modified playRhythm function
         function playRhythm() {
-            if (isPlaying) return;
+            if (isPlaying) stopRhythm();
             
             startCountdown(() => {
                 isPlaying = true;
@@ -468,15 +489,9 @@
                 marker.style.left = `${(time / maxDuration) * timeline.offsetWidth}px`;
                 marker.dataset.time = time;
                 
-                marker.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    marker.remove();
-                    markers = markers.filter(m => m !== marker);
-                    updateDuration();
-                    updateMarkerList();
-                });
+                markerAction(marker);
                 
-                makeMarkerDraggable(marker);
+                markerAction(marker);
                 timeline.appendChild(marker);
                 markers.push(marker);
             });
@@ -495,6 +510,7 @@
 
         // Clear all markers
         function clearMarkers() {
+            stopRhythm();
             markers.forEach(marker => marker.remove());
             markers = [];
             updateDuration();
