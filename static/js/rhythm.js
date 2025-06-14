@@ -27,9 +27,11 @@ class Rhythm {
 
     bindEvents() {
         this.timelineElement.addEventListener('click', (e) => this.handleTimelineClick(e));
+        
         document.getElementById('playBtn').addEventListener('click', () => this.play());
         document.getElementById('stopBtn').addEventListener('click', () => this.stop());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearMarkers());
+
         document.querySelectorAll('.preset-card').forEach(card => {
             card.addEventListener('click', () => this.loadPreset(card.dataset.preset));
         });
