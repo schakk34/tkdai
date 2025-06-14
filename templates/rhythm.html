@@ -164,9 +164,7 @@
                         <label for="durationSlider" class="form-label">Duration (seconds)</label>
                         <input type="range" class="form-range" id="durationSlider" min="5" max="120" value="10" step="1">
                     </div>
-                    <div>
-                        <span class="time-display">Duration: <span id="duration">0:00.000</span></span>
-                    </div>
+                    <span class="time-display">Duration: <span id="duration">0:00.000</span></span>
                 </div>
             </div>
 
@@ -193,7 +191,7 @@
             <h3 class="mt-5 mb-4">Preset Templates</h3>
             <div class="row g-4">
                 <div class="col-md-4">
-                    <div class="card preset-card" onclick="loadPreset('whiteBelt')">
+                    <div class="card preset-card" data-preset='whiteBelt'>
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-belt text-danger me-2"></i>White Belt Form</h5>
                             <p class="card-text">Basic form rhythm pattern for white belt practitioners.</p>
@@ -201,7 +199,7 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card preset-card" onclick="loadPreset('blackBelt')">
+                    <div class="card preset-card" data-preset='blackBelt'>
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-belt text-danger me-2"></i>Black Belt Form</h5>
                             <p class="card-text">Advanced form rhythm pattern for black belt practitioners.</p>
@@ -209,10 +207,10 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card preset-card" onclick="loadPreset('sparring')">
+                    <div class="card preset-card" data-preset='customChoreo'>
                         <div class="card-body">
-                            <h5 class="card-title"><i class="fas fa-fist-raised text-danger me-2"></i>Sparring Pattern</h5>
-                            <p class="card-text">Rhythm pattern for sparring combinations.</p>
+                            <h5 class="card-title"><i class="fas fa-fist-raised text-danger me-2"></i>Custom Choreo</h5>
+                            <p class="card-text">Custom pattern for choreo routine.</p>
                         </div>
                     </div>
                 </div>
@@ -469,6 +467,9 @@
             clearMarkers();
             const timeline = document.getElementById('rhythmTimeline');
             const maxDuration = parseFloat(document.getElementById('durationSlider').value);
+            const rect = timeline.getBoundingClientRect();
+
+            console.log("Loading preset:", preset);
             
             let times;
             switch(preset) {
@@ -478,18 +479,17 @@
                 case 'blackBelt':
                     times = [0, 1, 2.5, 3.5, 5, 6.5, 8, 9];
                     break;
-                case 'sparring':
+                case 'customChoreo':
                     times = [0, 0.5, 1.5, 2, 3, 3.5, 4.5, 5];
                     break;
             }
+            if (!times) return;
             
             times.forEach(time => {
                 const marker = document.createElement('div');
                 marker.className = 'rhythm-marker';
-                marker.style.left = `${(time / maxDuration) * timeline.offsetWidth}px`;
+                marker.style.left = `${(time / maxDuration) * rect.width}px`;
                 marker.dataset.time = time;
-                
-                markerAction(marker);
                 
                 markerAction(marker);
                 timeline.appendChild(marker);
@@ -522,6 +522,48 @@
         document.getElementById('playBtn').addEventListener('click', playRhythm);
         document.getElementById('stopBtn').addEventListener('click', stopRhythm);
         document.getElementById('clearBtn').addEventListener('click', clearMarkers);
+
+        document.querySelectorAll('.preset-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const preset = card.dataset.preset;
+                loadPreset(preset);
+            });
+        });
+
+        // const durationSlider = document.getElementById('durationSlider');
+        // const durationInput = document.getElementById('durationInput');
+
+        // // When slider changes, update input box and marker positions
+        // durationSlider.addEventListener('input', (e) => {
+        //     const value = parseFloat(e.target.value);
+        //     durationInput.value = value;
+        //     updateTimelineDuration(value);
+        // });
+
+        // // When input box changes, update slider and marker positions
+        // durationInput.addEventListener('input', (e) => {
+        //     let value = parseFloat(e.target.value);
+        //     if (isNaN(value)) return;
+
+        //     value = Math.max(5, Math.min(120, value)); // clamp between 5 and 120
+        //     durationSlider.value = value;
+        //     updateTimelineDuration(value);
+        // });
+
+        // // Helper function to update everything
+        // function updateTimelineDuration(maxDuration) {
+        //     const timeline = document.getElementById('rhythmTimeline');
+            
+        //     // Update marker positions based on their time values
+        //     markers.forEach(marker => {
+        //         const time = parseFloat(marker.dataset.time);
+        //         const newPosition = (time / maxDuration) * timeline.offsetWidth;
+        //         marker.style.left = `${newPosition}px`;
+        //     });
+
+        //     updateDuration();
+        //     updateMarkerList();
+        // }
     </script>
 </body>
 </html> 
