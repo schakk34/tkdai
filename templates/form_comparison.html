@@ -66,9 +66,14 @@
                         <div class="alert alert-success">
                             Recording complete! Click below to download your video.
                         </div>
-                        <a id="downloadLink" class="btn btn-success w-100">
-                            <i class="fas fa-download me-2"></i>Download Recording
-                        </a>
+                        <div class="d-flex gap-2">
+                            <a id="downloadLink" class="btn btn-success flex-grow-1">
+                                <i class="fas fa-download me-2"></i>Download Recording
+                            </a>
+                            <button id="saveRecordingToLibrary" class="btn btn-info">
+                                <i class="fas fa-save me-2"></i>Save to Library
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -127,6 +132,9 @@
                     </a>
                     <button id="analyzeForm" class="btn btn-primary ms-2">
                         <i class="fas fa-robot me-2"></i>Get AI Feedback
+                    </button>
+                    <button id="saveToLibrary" class="btn btn-info ms-2">
+                        <i class="fas fa-save me-2"></i>Save to Library
                     </button>
                 </div>
             </div>
@@ -376,6 +384,92 @@ document.getElementById('analyzeForm').addEventListener('click', async () => {
     } finally {
         button.disabled = false;
         button.innerHTML = '<i class="fas fa-robot me-2"></i>Get AI Feedback';
+    }
+});
+
+// Add save to library functionality
+document.getElementById('saveToLibrary').addEventListener('click', async () => {
+    const videoUrl = document.getElementById('resultVideo').src;
+    const formType = document.getElementById('formType').value;
+    
+    if (!videoUrl) {
+        alert('Please complete the form comparison first');
+        return;
+    }
+    
+    const title = prompt('Enter a title for this video:', `${formType.charAt(0).toUpperCase() + formType.slice(1)} Form - ${new Date().toLocaleDateString()}`);
+    if (!title) return;
+    
+    const description = prompt('Enter a description (optional):', '');
+    
+    try {
+        const response = await fetch('/library/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: 'video',
+                title: title,
+                description: description,
+                file_path: videoUrl,
+                form_type: formType
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Video saved to library successfully!');
+        } else {
+            alert(data.error || 'Failed to save video to library');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while saving to library');
+    }
+});
+
+// Add save recording to library functionality
+document.getElementById('saveRecordingToLibrary').addEventListener('click', async () => {
+    const downloadLink = document.getElementById('downloadLink');
+    const videoUrl = downloadLink.href;
+    
+    if (!videoUrl) {
+        alert('Please record a video first');
+        return;
+    }
+    
+    const title = prompt('Enter a title for this video:', `Poomsae Recording - ${new Date().toLocaleDateString()}`);
+    if (!title) return;
+    
+    const description = prompt('Enter a description (optional):', '');
+    
+    try {
+        const response = await fetch('/library/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: 'video',
+                title: title,
+                description: description,
+                file_path: videoUrl,
+                form_type: 'recording'  // Mark as a recording rather than a comparison
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Video saved to library successfully!');
+        } else {
+            alert(data.error || 'Failed to save video to library');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while saving to library');
     }
 });
 

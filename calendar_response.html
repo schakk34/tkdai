@@ -1,0 +1,528 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1"/>
+<meta property="og:title" content="World Taekwondo" />
+<meta property="og:url" content="https://m.worldtaekwondo.org/calendar/cld_list.html?cym=2025-6" />
+<meta property="og:image" content="https://m.worldtaekwondo.org/img/logo_600_600.png" />
+<meta property="og:description" content="WT CALENDAR" />
+<!--<meta property="og:type" content="" />-->
+<title>World Taekwondo WT CALENDAR</title>
+<link href="../css/world.css" rel="stylesheet" type="text/css"/>
+<link href="http://www.jqueryscript.net/css/jquerysctipttop.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+	<header>
+	    <!-- search -->
+	<div id="search02" class="search_layer" style="display:none;">
+		<a href="#" class="btn_close" onClick="document.form_srh.w.value=''; document.getElementById('search02').style.display='none'; document.getElementById('search01').style.display='none'; return false;"></a>
+		<span class="search_tit">search</span>
+        <span class="srh_form">
+            <!--<input type="text">
+            <a href="#"></a>
+            <button></button>-->
+			<form name="form_srh" method="get" action="/wtnews/list_srhrst.html" onsubmit="javascript:if(document.form_srh.w.value=='') { alert('Please enter a keyword to search!'); document.form_srh.w.focus(); return false; } else { return true; }">
+			<input type="text" name="w">
+			<button></button>
+			</form>
+		</span>
+    </div>
+	<div id="search01" class="pop_search_layer" style="display:none;"></div>
+    <!-- //search -->
+
+<!-- Start: mobilemenu -->
+<div id="header">
+	<div class="logo">
+		<a href="/index.html">WORLD TAEKWONDO</a>
+		<!--<a href="list.html">WORLD TAEKWONDO</a>-->
+	</div>
+	<div class="search"><a href="#" onClick="document.getElementById('search01').style.display=''; document.getElementById('search02').style.display=''; document.form_srh.w.focus(); return false;"></a></div>
+	<nav class="menubx">
+	<div>
+		<em></em>
+	</div>
+	<ul class="one_depth">
+        <!--<li><a href="#" class="election">ELECTION 2021<i class="icon_menu"></i></a>
+			<ul class="2depth" style="display: none;">
+				<li><a href="/election/election_2021_03.html">Result</a></li>
+				<li><a href="/election/election_2021_01.html">Candidates</a></li>
+				<li><a href="/election/election_2021.html">Outline</a></li>
+				<li><a href="/election/election_2021_02.html">Video</a></li>
+			</ul>
+		</li>-->
+		<!--<li><a href="#">WT NEWS<i class="icon_menu"></i></a>-->
+		<li><a href="#">NEWS<i class="icon_menu"></i></a>
+		<!--<li><a href="/wtnews/wtnews_index.html">WT NEWS<i class="icon_menu"></i></a>-->
+		<ul class="2depth">
+			<!--<li><a href="/wtnews/wtnews_index.html">WT NEWS Sub Home</a></li>
+			<li><a href="#">Whole Magazine</a></li>
+			<li><a href="/wtnews/list.html?mcd=C02">Whole News</a></li>
+			<li><a href="/wtnews/list.html?mcd=C03">Around the Organization</a></li>
+			<li><a href="/wtnews/list.html?mcd=C04">THF</a></li>
+			<li><a href="/wtnews/list.html?mcd=C05">MNA</a></li>
+			<li><a href="/wtnews/list.html?mcd=C06">CU</a></li>
+			<li><a href="/wtnews/list.html?mcd=C07">Para</a></li>
+			<li><a href="/wtnews/list.html?mcd=C08">Medical&amp;Anti-doping</a></li>
+			<li><a href="/wtnews/list.html?mcd=C09">General</a></li>-->
+			<li><a href="/wtnews/wtnews_index.html">NEWS</a></li>
+			<li><a href="/wtnews/list.html?mcd=C02">News</a></li>
+			<!--<li><a href="/wtnews/list.html?mcd=C11">Event</a></li>-->
+			<li><a href="/wtnews/list.html?mcd=C03">Around the Organization</a></li>
+			<li><a href="/wtnews/list.html?mcd=C14">Athletes</a></li>
+			<li><a href="/wtnews/list.html?mcd=C04">CARES/THF</a></li>
+			<li><a href="/wtnews/list.html?mcd=C12">CU/MNA</a></li>
+			<li><a href="/wtnews/list.html?mcd=C10">Demo Team</a></li>
+			<li><a href="/wtnews/list.html?mcd=C08">Medical &amp; Anti-doping</a></li>
+			<li><a href="/wtnews/list.html?mcd=C07">Para Taekwondo</a></li>
+			<!--<li><a href="/wtnews/list.html?mcd=C15">Para Newsletter</a></li>-->
+			<li><a href="/wtnews/list.html?mcd=C13">WT Council</a></li>
+			<li><a href="/wtnews/list.html?mcd=C17">Sustainability</a></li>
+		</ul>
+		</li>
+		<li><a href="#">COMPETITIONS<i class="icon_menu"></i></a>
+		<!--<li><a href="/competition/competition_index.html">COMPETITIONS<i class="icon_menu"></i></a>-->
+		<ul class="2depth">
+				<li><a href="/calendar/cld_list.html?cym=2025-6&cldgn=01">Upcoming events</a></li>
+				<li><a href="/ranking/hth_record_stats.html">Record&Stats</a></li>
+			<li><a href="/competition/list.html?mcd=A01&sc=re">Results</a></li>
+				<li><a href="/calendar/cld_list.html?cym=2025-6">Calendar</a></li>
+			<li><a href="/competition/howtobid.html">How to bid?</a></li>
+			<li><a href="/competition/competition_index.html">COMPETITIONS</a></li>
+			<!--<li><a href="/competition/list.html?mcd=B01">Whole Article</a></li>-->
+			<!--<li><a href="/competition/comp_index.html?mcd=C01">World Taekwondo Championships Mini home</a></li>-->
+			<li><a href="/competition/list.html?mcd=C11">World Taekwondo Championships</a></li>
+			<li><a href="/competition/list.html?mcd=D32">World Taekwondo Grand-Prix</a></li>
+			<li><a href="/competition/list.html?mcd=E07">World Para Taekwondo Championships</a></li>
+			<li><a href="/competition/list.html?mcd=F08">World Taekwondo Cadet Championships</a></li>
+			<li><a href="/competition/list.html?mcd=G12">World Taekwondo Worldcup Team Championships</a></li>
+			<li><a href="/competition/list.html?mcd=H07">World Taekwondo Junior Championships</a></li>
+			<li><a href="/competition/list.html?mcd=I05">World Taekwondo Beach Championships</a></li>
+			<li><a href="/competition/list.html?mcd=J07">World Taekwondo Poomsae Championships</a></li>
+			<li><a href="/competition/list.html?mcd=K17">World Taekwondo Grand Slam</a></li>
+			<!--<li><a href="/competition/view.html?nid=137567&mcd=S02&sc=in">Online 2020 World Taekwondo Poomsae Championships</a></li>-->
+			<li><a href="/competition/list.html?mcd=S10&sc=in">World Taekwondo Poomsae Open Challenge</a></li>
+			<li><a href="/competition/list.html?mcd=L06&sc=in">Olympic Games</a></li>
+			<li><a href="/competition/list.html?mcd=M03&sc=in">Paralympic Games</a></li>
+			<li><a href="/competition/comp_index.html?mcd=N03">Youth Olympic Games</a></li>
+			<li><a href="/competition/comp_index.html?mcd=O02">Continental Union Championships</a></li>
+			<li><a href="/competition/list.html?mcd=P03">FISU World University Games</a></li>
+			<!--<li><a href="/competition/comp_index.html?mcd=Q02">2019 Chungju World Martial Arts Masterships</a></li>-->
+			<li><a href="/competition/list.html?mcd=R10">Multi Games</a></li>
+			<li><a href="/competition/view.html?nid=138007&mcd=T02&sc=in">World Taekwondo Super Talent Show</a></li>
+			<li><a href="/competition/list.html?mcd=U05">World Taekwondo Grand Prix Challenge</a></li>
+			<li><a href="/competition/comp_index.html?mcd=V02">World Taekwondo Women's Open Championships</a></li>
+			<li><a href="/competition/list.html?mcd=W03">Virtual Taekwondo</a></li>
+			<li><a href="/competition/list.html?mcd=X05">World Para Taekwondo Grand Prix</a></li>
+			<li><a href="/competition/comp_index.html?mcd=Y05">Hope and Dreams Sports Festival</a></li>
+			<li><a href="/competition/list.html?mcd=Z02">World Para Taekwondo Poomsae Championships</a></li>
+			<!--<li><a href="#" onClick="alert('Coming soon!'); return false;">Result History</a></li>-->
+		</ul>
+		</li>
+		<!--<li><a href="#">RANKING<i class="icon_menu"></i></a>-->
+		<li><a href="#">ATHLETES<i class="icon_menu"></i></a>
+		<ul class="2depth">
+			<li><a href="/ranking/rk_index.html">ATHLETES</a></li>
+			<!--<li><a href="/ranking/hth_profile.html">Profile</a></li>-->
+			
+			<li><a href="/ranking/ranking.html">Ranking</a></li>
+			<!--<li><a href="/worldtaekwondo_m/ranking/af_list.html">Athlete Focus</a></li>-->
+			<!--<li><a href="/ranking/af_list.html">Athlete database</a></li>-->
+			<li><a href="/ranking/af_list.html">News</a></li>
+			<!--<li><a href="/ranking-wt/committee.html">Committee</a></li>-->
+			<!--<li><a href="/gms.html" target="_blank">GMS</a></li>-->
+		</ul>
+		</li>
+		<li><a href="#">MULTIMEDIA<i class="icon_menu"></i></a>
+		<ul class="2depth">
+			<li><a href="/wtnews/mm_list.html?sc=vi">Video</a></li>
+			<li><a href="/wtnews/mm_list.html?sc=ph">Photo</a></li>
+		</ul>
+		</li>
+		<li><a href="#">ABOUT WT<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/about-wt/about.html">Vision, Mission, Strategy</a></li>
+			<li><a href="/about-wt/organization.html">Organization</a></li>
+			<li><a href="/about-wt/cumna.html">CUs/MNAs</a></li>
+			<!--<li><a href="/about-wt/cumna_201026.html">CUs/MNAs</a></li>-->
+			<li><a href="/about-wt/office.html">Secretariat</a></li>
+			<li><a href="/about-wt/council.html">Council</a></li>
+			<li><a href="/about-wt/committees.html">Commissions And Committees</a></li>
+			<li><a href="/about-wt/wtdmt_about.html">WT Demo team</a></li>
+			<li><a href="/about-wt/logo.html">LOGO & OTHER DESIGNS</a></li>
+			<!--<li><a href="/about-wt/rtc.html">Recognized Training Center</a></li>-->
+			<!--<li><a href="/about-wt/para_board.html">Para-Taekwondo Governing Board</a></li>
+			<li><a href="/about-wt/member.html">Members</a></li>
+			<li><a href="/about-wt/report.html">Reports</a></li>-->
+		</ul>
+		</li>
+		<li><a href="#">PARTNERS & SUPPLIERS<i class="icon_menu"></i></a>
+		<ul>
+			<!--<li><a href="/wtpartners-wt/partner.html">Partners</a></li>-->
+			<!--<li><a href="/wtpartners-wt/sponsor.html">Sponsors</a></li>-->
+			<li><a href="/wtpartners-wt/recognize.html">Recognised Companies</a></li>
+			<li><a href="/wtpartners-wt/wt_compliant_com.html">WT-Compliant OVR Companies</a></li>
+			<li><a href="/wtpartners-wt/virtual_taekwondo.html">Virtual Taekwondo</a></li>
+			<li><a href="/wtpartners-wt/demo_team_sponsor.html">Demo Team Sponsor</a></li>
+		</ul>
+		</li>
+		<li><a href="#">WT CALENDAR<i class="icon_menu"></i></a>
+		<ul class="2depth">
+			<li><a href="/calendar/cld_index.html">WT CALENDAR</a></li>
+			<li><a href="/calendar/cld_list.html?cym=2025-6&cldgn=01">Events</a></li>
+			<!--<li><a href="/calendar/cld_list.html?cym=2025-6&cldgn=02">Meetings</a></li>-->
+			<!--<li><a href="/calendar/cld_meetings.html">Meetings</a></li>-->
+			<li><a href="/calendar/cld_list.html?cym=2025-6&cldgn=03">Education</a></li>
+			<!--<li><a href="/calendar/evt_list.html">Event</a></li>
+			<li><a href="/calendar/cld.html">Calendar</a></li>-->
+		</ul>
+		</li>
+		<li><a href="#">SUSTAINABILITY<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/sustainability/sustainability_index.html">Sustainability Homepage</a></li>
+			<li><a href="/sustainability/sustainability_about.html">About WT Sustainability</a></li>
+			<li><a href="/sustainability/sustainability_committee.html">Sustainability Committee</a></li>
+			<li><a href="/sustainability/sustainability_strategy.html">Sustainability Strategy</a></li>
+			<li><a href="/sustainability/sustainability_awards.html">Sustainability Awards Case Studies</a></li>
+			<li><a href="/sustainability/sustainability_reports.html">Reports and Resources</a></li>
+			<li><a href="/sustainability/stntc_list.html">Notice</a></li>
+			<li><a href="/sustainability/stnews_list.html">Latest News</a></li>
+		</ul>
+		</li>
+		<li><a href="#">INTEGRITY<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/integrity/integrity_index.html">Index Page</a></li>
+			<li><a href="/integrity/integrity_clean.html">Clean Sport (Anti-Doping)</a></li>
+			<li><a href="/integrity/integrity_fair.html">Fair Sport (Prevention on the Manipulation of Competitions)</a></li>
+			<li><a href="/integrity/integrity_safe.html">Safe Sport (Prevention of Harassment & Abuse)</a></li>
+			<li><a href="/integrity/integrity_education.html">Education and Certification</a></li>
+			<li><a href="/integrity/integrity_rules.html">Rules & Sanctions</a></li>
+			<li><a href="/integrity/integrity_about.html">WT Integrity Unit (About Us)</a></li>
+			<li><a href="/integrity/integrity_report.html">Reporting</a></li>
+		</ul>
+		</li>
+		<li><a href="/magazine/magazine.html">MAGAZINE<i class="icon_menu"></i></a></li>
+		<!--<li><a href="/para-wt/para_about.html">PARA<i class="icon_menu"></i></a></li>-->
+		<li><a href="#">PARA<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/para-wt/para_about.html">PARA</a></li>
+			<li><a href="/para-wt/para_mdf_fpa.html">MDF Form Preparation Assistance</a></li>
+			<li><a href="/para-wt/para_crs.html">Para Taekwondo Classification Room Specification</a></li>
+			<li><a href="/para-wt/para_cii.html">Guide to WT Para Classification of Icons and Infographics</a></li>
+			<li><a href="/para-wt/para_newsletter.html">Para Taekwondo Newsletter</a></li>
+			<li><a href="https://db.ipc-services.org/wtcs/web/" target="_blank">WT Classification Master List</a></li>
+		</ul>
+		</li>
+		<li><a href="https://worldtkd.simplycompete.com/events" target="_blank">GMS<i class="icon_menu"></i></a></li>
+		<!--<li><a href="#">ANTI-DOPING<i class="icon_menu"></i></a>-->
+		<li><a href="#">CLEAN SPORT<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/wtnews/cn_list.html?mcd=H01&ncd=02">News</a></li>
+			<li><a href="/wtnews/cn_list.html?mcd=H01&ncd=02&sc=vi">Multimedia</a></li>
+			<li><a href="/anti_doping-wt/about.html">About Anti-Doping / Clean Sport</a></li>
+			<li><a href="/anti_doping-wt/documents.html">Documents / Regulations & Statistics</a></li>
+			<li><a href="/anti_doping-wt/testing.html">Testing, Intelligence & RTP</a></li>
+			<li><a href="/anti_doping-wt/prohibited.html">Prohibited List</a></li>
+			<li><a href="/anti_doping-wt/therapeutic.html">Therapeutic Use Exemptions(TUEs)</a></li>
+			<li><a href="/anti_doping-wt/nutritional.html">Nutritional Supplements</a></li>
+			<li><a href="/anti_doping-wt/sanctioned.html">Sanctioned Athletes and Officials</a></li>
+			<li><a href="/anti_doping-wt/education.html">Education Tools</a></li>
+			<li><a href="/anti_doping-wt/committee.html">Committees and Ambassadors</a></li>
+			<li><a href="/anti_doping-wt/reporting.html">Reporting</a></li>
+			<li><a href="https://adams.wada-ama.org" target="_blank">ADAMS</a></li>
+		</ul>
+		</li>
+		<li><a href="#">DEVELOPMENT<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/development-wt/aboutwtdp.html"><!--About WT -->Development Program</a></li>
+			<li><a href="/wtnews/cn_list.html?mcd=J01&ncd=06">News</a></li>
+			<!--<li><a href="/development-wt/program.html">Development Program</a></li>-->
+			<li><a href="/development-wt/tfa.html">Taekwondo For All</a></li>
+			<li><a href="/development-wt/thf.html">THF</a></li>
+			<li><a href="/development-wt/tpc.html">Taekwondo Peace Corps</a></li>
+			<li><a href="/development-wt/mrd_reports.html">Reports</a></li>
+			<li><a href="/development-wt/legacy.html">Legacy Program Resources</a></li>
+		</ul>
+		</li>
+		<li><a href="#">EDUCATION<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/education-wt/aboutwtedu.html">About WT Education</a></li>
+			<!--<li><a href="/education-wt/edu_calendar.html">Education Calendar</a></li>-->
+			<li><a href="/calendar/educld_list.html?cldgn=03">Education Calendar</a></li>
+			<!--<li><a href="/education-wt/edu_news.html">News</a></li>-->
+			<li><a href="/wtnews/cn_list.html?mcd=C16&ncd=08">News</a></li>
+			<li><a href="/about-wt/rtc.html">WT Recognized Centers</a></li>
+			<!--<li><a href="/notice/ec_list.html?ec=07">Education Materials</a></li>-->
+			<li><a href="/education-wt/edu_docu.html">Education Documents</a></li>
+		</ul>
+		</li>
+		<li><a href="#">DOCUMENTS<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/documents-wt/docu.html">Documents</a></li>
+			<li><a href="/rules-wt/rules.html">WT rules</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=14">Meetings</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=12">&nbsp;&nbsp;- General Assembly</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=01">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Agenda</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=02">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Minutes</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=34">&nbsp;&nbsp;- Council Meeting</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=03">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Agenda</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=04">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Minutes</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=05">Reports</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=05">&nbsp;&nbsp;- Annual report</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=06">&nbsp;&nbsp;- Financial Statement</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=07">&nbsp;&nbsp;- Committee</a></li>
+			<!--<li><a href="/documents-wt/docu.html?cd1=08">&nbsp;&nbsp;- Brand Guideline</a></li>-->
+			<!--<li><a href="/documents-wt/docu.html?cd1=09">&nbsp;&nbsp;- Disciplinary</a></li>-->
+			<li><a href="/documents-wt/disciplinary.html">&nbsp;&nbsp;- Disciplinary</a></li>
+			<li><a href="/election/election_2025.html">&nbsp;&nbsp;- Election</a></li>
+			<li><a href="/documents-wt/docu.html?cd1=11">&nbsp;&nbsp;- MNA Survey</a></li>
+		</ul>
+		</li>
+		<!--<li><a href="/notice/list.html">NOTICE<i class="icon_menu"></i></a></li>-->
+		<li><a href="#">NOTICE<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/notice/list.html">Notice</a></li>
+			<li><a href="/notice/list.html?mcd=F02">Sport</a></li>
+			<li><a href="/notice/list.html?mcd=F03">Education</a></li>
+			<li><a href="/notice/list.html?mcd=F04">GMS</a></li>
+			<li><a href="/notice/list.html?mcd=F05">Para</a></li>
+			<li><a href="/notice/list.html?mcd=F06">Bid</a></li>
+			<li><a href="/notice/list.html?mcd=F07">General</a></li>
+			<li><a href="/notice/list.html?mcd=F08">Applications</a></li>
+			<li><a href="/notice/list.html?mcd=F09">Sustainability</a></li>
+		</ul>
+		</li>
+		<!--<li><a href="#">ë©ë´ ë³ê²½ êµ¬ë¶ ìì­<i class="icon_menu"></i></a>
+		<ul class="2depth">
+			<li><a href="/wtnews/wtnews_index.html">ë©ë´ ë³ê²½ êµ¬ë¶ ìì­</a></li>
+		</ul>
+		</li>-->
+		<!--<li><a href="#">RULES&middot;DOCS<i class="icon_menu"></i></a>
+		<ul class="2depth">
+			<li><a href="/worldtaekwondo_m/rules-wt/rules_index.html">RULES&middot;DOCS Sub Home</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Whole Rules&middot;Docs</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Kyourgi</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Poomsae</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Para-Taekwondo</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Referee</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Statutes</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Governance</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">GMS</a></li>
+			<li><a href="/worldtaekwondo_m/rules-wt/rules.html">Brand Guidelines</a></li>
+		</ul>
+		</li>-->
+		<!--<li><a href="#">MEDICAL<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/wtnews/cn_list.html?mcd=G01&ncd=01">News</a></li>
+			<li><a href="/worldtaekwondo_m/medical-wt/forms.html">Forms</a></li>
+			<li><a href="/worldtaekwondo_m/medical-wt/regulation.html">Regulation</a></li>
+			<li><a href="/worldtaekwondo_m/medical-wt/statistics.html">Statistics &amp; Researches</a></li>
+			<li><a href="/worldtaekwondo_m/medical-wt/committee.html">Committees and Ambassadors</a></li>
+			<li><a href="/worldtaekwondo_m/medical-wt/education.html">Education</a></li>
+		</ul>
+		</li>-->
+		<!--<li><a href="#">PARA<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/wtnews/cn_list.html?mcd=I01&ncd=03">PARA Championships</a></li>
+			<li><a href="/wtnews/cn_list.html?mcd=I02&ncd=04">Ranking</a></li>
+			<li><a href="/wtnews/cn_list.html?mcd=I03&ncd=05">News</a></li>
+			<li><a href="/worldtaekwondo_m/para-wt/about.html">About Para</a></li>
+			<li><a href="/worldtaekwondo_m/para-wt/para_board.html">Para-Taekwondo Governing Board</a></li>
+		</ul>
+		</li>-->
+		<!--<li><a href="#">DEMO TEAM<i class="icon_menu"></i></a>
+		<ul>
+			<li><a href="/wtnews/cn_list.html?mcd=C10&ncd=07">News</a></li>
+		</ul>
+		</li>-->
+	</ul>
+	</nav>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<!--<script src="../js/menu.js" type="text/javascript"></script>-->
+<!--<script src="/worldtaekwondo_m/js/menu.js" type="text/javascript"></script>-->
+<script src="/js/menu.js" type="text/javascript"></script>
+<!--// End: mobilemenu -->
+	</header>
+
+<div id="container">
+	<div class="top_btn"><a href="#" onClick="window.scrollTo(0,0); return false;">top</a></div>
+
+	<div class="tab_title_hd">
+		<span>WT CALENDAR</span>CALENDAR	</div>
+
+	<!--<div class="total">Total of 6</div>-->
+		<div class="align_fr">
+			<!--<span class="btn_dblue_dn"><a href="https://www.worldtaekwondo.org/viewer_pdf/external/pdfjs-2.1.266-dist/web/viewer.html?file=https://www.worldtaekwondo.org/att_file_up/wt_calendar/2024/2024 WT EVENT CALENDAR-Kyorugi(11012024).pdf" target="_blank">Download Calendar(Kyorugi)&nbsp;&nbsp;&nbsp;</a></span><br>
+			<span class="btn_dblue_dn"><a href="https://www.worldtaekwondo.org/viewer_pdf/external/pdfjs-2.1.266-dist/web/viewer.html?file=https://www.worldtaekwondo.org/att_file_up/wt_calendar/2024/2024 WT EVENT CALENDAR-Poomsae(11012024).pdf" target="_blank">Download Calendar(Poomsae)</a></span><br>-->
+			<span class="btn_dblue_dn"><a href="https://www.worldtaekwondo.org/viewer_pdf/external/pdfjs-2.1.266-dist/web/viewer.html?file=https://www.worldtaekwondo.org/att_file_up/wt_calendar/2025/2025 WT EVENT CALENDAR(20250530).pdf" target="_blank">Download 2025 Calendar&nbsp;</a></span><br>
+			<span class="btn_dblue_dn"><a href="https://www.worldtaekwondo.org/viewer_pdf/external/pdfjs-2.1.266-dist/web/viewer.html?file=https://www.worldtaekwondo.org/att_file_up/wt_calendar/2025/2025 World Para Taekwondo Event Calendar 20250606.pdf" target="_blank">Download Calendar(Para)</a></span>
+		</div>
+		<div class="align_fr">&nbsp;</div>
+		<div class="calendar_bx in10">
+			<div class="year">2025</div>
+			<div class="monthly">
+				 6<span>June</span>
+				<div class="monthly_next"><a href="cld_list.html?cym=2025-7&cldgn="></a></div>
+				<div class="monthly_past"><a href="cld_list.html?cym=2025-5&cldgn="></a></div>
+			</div>
+			<ul class="date_day">
+
+			<li>
+				<a href="cld_view.html?nid=142024&cym=2025-6">
+				<span class="day">1 ~ 7</span>
+				<span class="title" style="text-transform:none;">[KYORUGI] WT Online Kyorugi Coach Certification Course (LV1)</span>
+				</a>
+			</li>
+		
+			<li>
+				<a href="cld_view.html?nid=141995&cym=2025-6">
+				<span class="day">9 ~ 12</span>
+				<span class="title" style="text-transform:none;">â¨[KYORUGI] 137th IR Seminar & 152nd IR Refresher Course (Lima, Peru)</span>
+				</a>
+			</li>
+		
+			<li>
+				<a href="cld_view.html?nid=141996&cym=2025-6">
+				<span class="day">14 ~ 18</span>
+				<span class="title" style="text-transform:none;">â¨[POOMSAE] 62nd IR Seminar & 59th IR Refresher Course (Lima, Peru)</span>
+				</a>
+			</li>
+		
+			<li>
+				<a href="cld_view.html?nid=142027&cym=2025-6">
+				<span class="day">15 ~ 21</span>
+				<span class="title" style="text-transform:none;">[POOMSAE] WT Online Poomsae Coach Certification Course</span>
+				</a>
+			</li>
+		
+			<li>
+				<a href="cld_view.html?nid=142028&cym=2025-6">
+				<span class="day">15 ~ 21</span>
+				<span class="title" style="text-transform:none;">[KYORUGI] WT Online Kyorugi Coach Certification Course (LV2)</span>
+				</a>
+			</li>
+		
+			<li>
+				<a href="cld_view.html?nid=142029&cym=2025-6">
+				<span class="day">15 ~ 21</span>
+				<span class="title" style="text-transform:none;">[KYORUGI] WT Online Kyorugi Coach Refresher Course (LV1,2)</span>
+				</a>
+			</li>
+				  <!--<li>
+            <a href="#">
+            <span class="day">AUG.30 - 6</span>
+            <span class="title">2019 Chungju World Martial Arts Masterships</span>
+			  </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">8</span>
+            <span class="title">2019 Beirut Open</span>
+				  </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">13 - 15</span>
+            <span class="title">Chile Open</span>
+				  </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">13</span>
+            <span class="title">Chile Para Taekwondo Open</span>
+				  </a>
+          </li>
+          <li class="point">
+            <a href="#">
+            <span class="day">13 - 15</span>
+            <span class="title">Chiba 2019 World Taekwondo Grand-Prix</span>
+            </a>
+          </li>
+          <li>          
+			  <a href="#">
+            <span class="day">20 - OCT. 20</span>
+            <span class="title">Greece Open 2019</span>
+            </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">20 - 22</span>
+            <span class="title">Argentina Open</span>
+			  </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">21</span>
+            <span class="title">Polish Open 2019</span>
+			  </a>
+          </li>
+          <li>
+			  <a href="#">
+            <span class="day">22</span>
+            <span class="title">Albanian Open 2019</span>
+			  </a>
+          </li>
+			<li>
+			  <a href="#">
+            <span class="day">27</span>
+            <span class="title">Tokyo 2020 Olympic Games Test Event</span>
+			  </a>
+          </li>
+			<li>
+			  <a href="#">
+            <span class="day">28</span>
+            <span class="title">Tokyo 2020 Paralympic Games Test Event</span>
+			  </a>
+          </li>
+			<li>
+			  <a href="#">
+            <span class="day">28 - 29</span>
+            <span class="title">Russia Open 2019</span>
+			  </a>
+          </li>-->
+        </ul>
+		</div><!--//calendar_bx-->
+
+	<footer>
+		<div id="footer">
+		<!--<span><img src="../img/footer_logo.png" alt=""/></span>-->
+		<span><img src="/img/footer_logo.png" alt=""/></span>
+		<!-- footer SNS ì¶ê° -->
+		<ul class="foot_sns">
+			<li><a href="https://www.facebook.com/WorldTaekwondo" class="facebook"></a></li>
+			<li><a href="https://www.instagram.com/worldtaekwondo/" class="instar"></a></li>
+			<li><a href="https://twitter.com/WorldTaekwondo" class="twitter"></a></li>
+			<li><a href="https://www.youtube.com/user/worldtaekwondo" class="youtube"></a></li>
+			<li><a href="https://www.tiktok.com/@worldtaekwondo?lang=ko-KR" class="tiktok"></a></li>
+		</ul>
+		<p>World Taekwondo Headquarters</p>
+		Booyoung Taepyung Building 10th Floor, <!--<br>-->55, Sejong-daero <br>(Taepyung-ro 2ga), Jung-gu, <!--<br>-->Seoul, Republic of Korea, 04513<br>
+		<!--Email : info@worldtaekwondo.org / <br>-->
+		Tel : +82 2 566 2505 / Fax : +82 2 553 4728<br>
+		<a href="/about-wt/office.html">Contact information</a>
+		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/privacy/privacy_policy.html" target="_blank">Privacy Policy</a>
+		<p>World Taekwondo Lausanne Office</p>
+		Avenue de Rhodanie 54 1007 Lausanne Switzerland<br>
+		Email : office@worldtaekwondo.org / <br>Tel : +41 21 601 50 13 / Fax : +41 21 601 59 83
+		<br><br><br>
+	</div>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-SPK6K870R3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-SPK6K870R3');
+</script>
+	</footer>
+
+</div><!-- End : container-->
+
+</body>
+</html>
