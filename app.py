@@ -8,10 +8,17 @@ from functools import wraps
 import os
 from datetime import datetime
 import cv2
+from form_comparison import FormComparison
+from werkzeug.utils import secure_filename
+import time
+import subprocess
+from form_analyzer import FormAnalyzer
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkd.db'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 db = SQLAlchemy(app)
 
 # User model for authentication
@@ -221,6 +228,123 @@ def next_pose():
             'current_pose': white_belt_form.get_current_pose_name()
         })
     return jsonify({'success': False, 'error': 'Current pose not confirmed yet'})
+
+@app.route('/form-comparison')
+@login_required
+def form_comparison():
+    return render_template('form_comparison.html')
+
+@app.route('/process-form-comparison', methods=['POST'])
+@login_required
+def process_form_comparison():
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file provided'}), 400
+        
+    video_file = request.files['video']
+    rhythm_file = request.files.get('rhythm')
+    form_type = request.form.get('formType')
+    
+    if not video_file or not form_type:
+        return jsonify({'error': 'Missing required fields'}), 400
+        
+    # Create user-specific upload directory
+    user_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(session['user_id']))
+    os.makedirs(user_upload_dir, exist_ok=True)
+    
+    try:
+        # Save uploaded files with timestamps
+        timestamp = int(time.time())
+        
+        # Save video file
+        video_filename = secure_filename(f"{form_type}_user_{timestamp}.webm")
+        video_path = os.path.join(user_upload_dir, video_filename)
+        video_file.save(video_path)
+        
+        # Convert webm to mp4 using ffmpeg
+        mp4_filename = f"{form_type}_user_{timestamp}.mp4"
+        mp4_path = os.path.join(user_upload_dir, mp4_filename)
+        
+        # Use ffmpeg to convert the video
+        subprocess.run([
+            'ffmpeg', '-i', video_path,
+            '-c:v', 'libx264', '-preset', 'medium',
+            '-c:a', 'aac', '-b:a', '128k',
+            mp4_path
+        ], check=True)
+        
+        # Remove the original webm file
+        os.remove(video_path)
+        
+        # Process rhythm file if provided
+        rhythm_path = None
+        if rhythm_file and allowed_file(rhythm_file.filename):
+            rhythm_filename = secure_filename(f"{form_type}_rhythm_{timestamp}.mp3")
+            rhythm_path = os.path.join(user_upload_dir, rhythm_filename)
+            rhythm_file.save(rhythm_path)
+        
+        # Process the video
+        output_filename = f"{form_type}_comparison_{timestamp}.mp4"
+        output_path = os.path.join(user_upload_dir, output_filename)
+        
+        # Check if ideal data exists
+        ideal_data_path = f'static/{form_type}_ideal_data.json'
+        if not os.path.exists(ideal_data_path):
+            return jsonify({'error': f'No ideal data found for {form_type} form'}), 400
+        
+        comparator = FormComparison(ideal_data_path=ideal_data_path)
+        success = comparator.process_user_video(
+            user_video_path=mp4_path,
+            output_path=output_path,
+            audio_path=rhythm_path
+        )
+        
+        if success:
+            # Clean up intermediate files
+            os.remove(mp4_path)
+            if rhythm_path:
+                os.remove(rhythm_path)
+                
+            return jsonify({
+                'success': True,
+                'video_url': f'/static/uploads/{session["user_id"]}/{output_filename}'
+            })
+        else:
+            return jsonify({'error': 'Failed to process video'}), 500
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error converting video: {str(e)}")
+        return jsonify({'error': 'Failed to convert video format'}), 500
+    except Exception as e:
+        print(f"Error processing video: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'mp3', 'wav'}
+
+# Initialize the form analyzer
+form_analyzer = FormAnalyzer()
+
+@app.route('/analyze-form', methods=['POST'])
+@login_required
+def analyze_form():
+    try:
+        data = request.get_json()
+        video_url = data.get('video_url')
+        
+        if not video_url:
+            return jsonify({'error': 'No video URL provided'}), 400
+            
+        # Analyze the form using HuggingFace API
+        result = form_analyzer.analyze_form(video_url)
+        
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify({'error': result['error']}), 500
+            
+    except Exception as e:
+        print(f"Error in analyze-form endpoint: {str(e)}")
+        return jsonify({'error': 'Failed to analyze form'}), 500
 
 if __name__ == '__main__':
     with app.app_context():
