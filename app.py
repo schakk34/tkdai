@@ -360,33 +360,33 @@ def practice():
 def rhythm():
     return render_template('rhythm.html', user=current_user)
 
-@app.route('/front-kick')
-@login_required
-def front_kick():
-    global practice_studio
-    practice_studio = PracticeStudio(1)
-    return render_template('front_kick.html')
-
-@app.route('/roundhouse-kick')
-@login_required
-def roundhouse_kick():
-    global practice_studio
-    practice_studio = PracticeStudio(2)
-    return render_template('roundhouse_kick.html')
-
-@app.route('/basic-punches')
-@login_required
-def basic_punches():
-    global practice_studio
-    practice_studio = PracticeStudio(3)
-    return render_template('basic_punches.html')
-
-@app.route('/poomsae')
-@login_required
-def poomsae():
-    global practice_studio
-    practice_studio = PracticeStudio(4)
-    return render_template('poomsae.html')
+# @app.route('/front-kick')
+# @login_required
+# def front_kick():
+#     global practice_studio
+#     practice_studio = PracticeStudio(1)
+#     return render_template('front_kick.html')
+#
+# @app.route('/roundhouse-kick')
+# @login_required
+# def roundhouse_kick():
+#     global practice_studio
+#     practice_studio = PracticeStudio(2)
+#     return render_template('roundhouse_kick.html')
+#
+# @app.route('/basic-punches')
+# @login_required
+# def basic_punches():
+#     global practice_studio
+#     practice_studio = PracticeStudio(3)
+#     return render_template('basic_punches.html')
+#
+# @app.route('/poomsae')
+# @login_required
+# def poomsae():
+#     global practice_studio
+#     practice_studio = PracticeStudio(4)
+#     return render_template('poomsae.html')
 
 @app.route('/white-belt-form')
 @login_required
@@ -569,12 +569,12 @@ def library():
         item_type='video'
     ).order_by(LibraryItem.created_at.desc()).all()
     
-    metronomes = LibraryItem.query.filter_by(
+    rhythms = LibraryItem.query.filter_by(
         user_id=current_user.id,
-        item_type='metronome'
+        item_type='rhythm'
     ).order_by(LibraryItem.created_at.desc()).all()
     
-    return render_template('library.html', videos=videos, metronomes=metronomes)
+    return render_template('library.html', videos=videos, rhythms=rhythms)
 
 @app.route('/library/save', methods=['POST'])
 @login_required
@@ -588,7 +588,7 @@ def save_to_library():
         
         print(f"Saving to library - Type: {item_type}, Title: {title}, File: {file_path}")  # Debug log
         
-        if not all([item_type, title, file_path]):
+        if not all([item_type, title]):
             return jsonify({'success': False, 'error': 'Missing required fields'})
         
         # Convert the file path to a URL
@@ -600,7 +600,7 @@ def save_to_library():
             filename = os.path.basename(file_path)
             file_path = url_for('serve_upload', filename=filename, _external=True)
             print(f"Converted file path to URL: {file_path}")  # Debug log
-        
+        print("hi")
         # Create new library item
         item = LibraryItem(
             user_id=current_user.id,
@@ -613,8 +613,7 @@ def save_to_library():
         # Add type-specific data
         if item_type == 'video':
             item.form_type = data.get('form_type')
-        elif item_type == 'metronome':
-            item.bpm = data.get('bpm')
+        elif item_type == 'rhythm':
             item.markers = data.get('markers')
         
         db.session.add(item)

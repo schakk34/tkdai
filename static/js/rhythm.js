@@ -27,13 +27,14 @@ class Rhythm {
 
     bindEvents() {
         this.timelineElement.addEventListener('click', (e) => this.handleTimelineClick(e));
-        
+
         document.getElementById('playBtn').addEventListener('click', () => this.play());
         document.getElementById('stopBtn').addEventListener('click', () => this.stop());
-        document.getElementById('clearBtn').addEventListener('click', () => this.clearMarkers());
+        document.getElementById('saveBtn').addEventListener('click', () => this.save());
+        document.getElementById('clearBtn').addEventListener('click', () => this.clear());
 
-        document.querySelectorAll('.preset-card').forEach(card => {
-            card.addEventListener('click', () => this.loadPreset(card.dataset.preset));
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', () => this.loadTemplate(card.dataset.template));
         });
         this.durationSlider.addEventListener('input', () => this.durationSliderChange());
     }
@@ -96,7 +97,7 @@ class Rhythm {
             if (isDragging) {
                 isDragging = false;
                 if (hasMoved) this.suppressNextClick = true;
-                this.updateDuration();
+                this.durationSliderChange();
             }
         };
 
@@ -105,7 +106,7 @@ class Rhythm {
                 e.stopPropagation();
                 this.timelineElement.removeChild(marker);
                 this.markers = this.markers.filter(m => m !== marker);
-                this.updateDuration();
+                this.durationSliderChange();
                 this.updateMarkerList();
             }
         };
@@ -192,16 +193,6 @@ class Rhythm {
         }, duration * 1000);
     }
 
-    stop() {
-        this.isPlaying = false;
-        clearTimeout(this.loopTimeout);
-        this.scheduledOscillators.forEach(osc => {
-            try { osc.stop(); } catch (_) {}
-        });
-        this.scheduledOscillators = [];
-        this.playbackIndicator.style.left = '0px';
-    }
-
     animatePlaybackIndicator(startTime, duration) {
         const indicator = this.playbackIndicator;
         const timelineWidth = this.timelineElement.offsetWidth;
@@ -237,32 +228,85 @@ class Rhythm {
         this.scheduledOscillators.push(osc);
     }
 
-    clearMarkers() {
+    stop() {
+        this.isPlaying = false;
+        clearTimeout(this.loopTimeout);
+        this.scheduledOscillators.forEach(osc => {
+            try { osc.stop(); } catch (_) {}
+        });
+        this.scheduledOscillators = [];
+        this.playbackIndicator.style.left = '0px';
+    }
+
+    save() {
+        this.stop();
+
+        const duration = parseFloat(this.durationSlider.value);
+        const markers = this.markers
+            .map(marker => parseFloat(marker.dataset.time))
+            .sort((a, b) => a - b);
+
+        const title = prompt("Enter a title for your rhythm:");
+        if (!title) return;
+
+        const data = {
+            type: 'rhythm',
+            title: title,
+            description: `Saved rhythm with ${markers.length} markers`,
+            file_path: '',  // optional if you have a real audio file
+            duration: duration,
+            markers: markers,
+        };
+
+        fetch('/library/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(response => {
+            if (response.success) {
+                alert('Rhythm saved to your library!');
+            } else {
+                alert(`Failed to save: ${response.error}`);
+            }
+        })
+        .catch(err => {
+            console.error('Save error:', err);
+            alert('Something went wrong saving your rhythm.');
+        });
+    }
+
+    clear() {
         this.stop();
         this.markers.forEach(marker => marker.remove());
         this.markers = [];
-        this.updateDuration();
+        this.durationSliderChange();
         this.updateMarkerList();
     }
 
-    loadPreset(preset) {
-        const presets = {
-            whiteBelt: [0, 1.5, 3, 4.5, 6, 7.5],
-            blackBelt: [0, 1, 2.5, 3.5, 5, 6.5, 8, 9],
-            customChoreo: [0, 0.5, 1.5, 2, 3, 3.5, 4.5, 5]
+    loadTemplate(template) {
+        const templates = {
+            whiteBelt: [7.5, [0, 1.5, 3, 4.5, 6, 7.5]],
+            blackBelt: [9, [0, 1, 2.5, 3.5, 5, 6.5, 8, 9]],
+            customChoreo: [5, [0, 0.5, 1.5, 2, 3, 3.5, 4.5, 5]]
         };
-        if (!(preset in presets)) return;
-        this.clearMarkers();
-        const maxDuration = parseFloat(this.durationSlider.value);
+        if (!(template in templates)) return;
+        this.clear();
+        const set = templates[template]
+        const maxDuration = set[0] > parseFloat(this.durationSlider.max) ? parseFloat(this.durationSlider.max) : set[0];
+        this.durationSlider.value = maxDuration
         const rect = this.timelineElement.getBoundingClientRect();
-        presets[preset].forEach(time => {
+        set[1].forEach(time => {
             const left = (time / maxDuration) * rect.width;
             const marker = this.addMarker(time, left);
             this.timelineElement.appendChild(marker);
             this.markers.push(marker);
         });
-        this.updateDuration();
+        this.durationSliderChange();
         this.updateMarkerList();
     }
+
+
 
 }

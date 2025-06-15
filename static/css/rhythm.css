@@ -78,11 +78,11 @@
         .duration-control {
             width: 200px;
         }
-        .preset-card {
+        .template-card {
             transition: transform 0.3s;
             cursor: pointer;
         }
-        .preset-card:hover {
+        .template-card:hover {
             transform: translateY(-5px);
         }
         .control-btn {

@@ -41,7 +41,7 @@
         border-radius: 4px;
         background: #f8f9fa;
     }
-    .metronome-preview {
+    .rhythm-preview {
         padding: 15px;
         background: #f8f9fa;
         border-radius: 4px;
@@ -71,8 +71,8 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="metronomes-tab" data-bs-toggle="tab" data-bs-target="#metronomes" type="button" role="tab">
-                <i class="fas fa-music me-2"></i>Metronomes
+            <button class="nav-link" id="rhythms-tab" data-bs-toggle="tab" data-bs-target="#rhythms" type="button" role="tab">
+                <i class="fas fa-music me-2"></i>Rhythms
             </button>
         </li>
     </ul>
@@ -124,16 +124,16 @@
             </div>
         </div>
         
-        <!-- Metronomes Tab -->
-        <div class="tab-pane fade" id="metronomes" role="tabpanel">
-            <div class="row" id="metronomesContainer">
-                {% for item in metronomes %}
+        <!-- Rhythms Tab -->
+        <div class="tab-pane fade" id="rhythms" role="tabpanel">
+            <div class="row" id="rhythmsContainer">
+                {% for item in rhythms %}
                 <div class="col-md-6 col-lg-4">
                     <div class="library-item">
                         <div class="item-header">
                             <h3 class="item-title">{{ item.title }}</h3>
                             <div class="item-actions">
-                                <button class="btn btn-sm btn-outline-primary" onclick="playMetronome('{{ item.file_path }}')">
+                                <button class="btn btn-sm btn-outline-primary" onclick="playRhythm('{{ item.file_path }}')">
                                     <i class="fas fa-play"></i>
                                 </button>
                                 <button class="btn btn-sm btn-outline-success" onclick="exportItem('{{ item.file_path }}', '{{ item.title }}')">
@@ -144,7 +144,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="metronome-preview">
+                        <div class="rhythm-preview">
                             <div>BPM: {{ item.bpm }}</div>
                             <div>Markers: {{ item.markers|length }}</div>
                         </div>
@@ -246,9 +246,9 @@ function exportItem(filePath, title) {
     document.body.removeChild(link);
 }
 
-function playMetronome(metronomePath) {
-    // Implement metronome playback
-    console.log('Playing metronome:', metronomePath);
+function playRhythm(rhythmPath) {
+    // Implement rhythm playback
+    console.log('Playing rhythm:', rhythmPath);
 }
 
 function deleteItem(itemId) {
