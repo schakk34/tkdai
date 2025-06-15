@@ -35,7 +35,7 @@ class Rhythm {
         document.querySelectorAll('.preset-card').forEach(card => {
             card.addEventListener('click', () => this.loadPreset(card.dataset.preset));
         });
-        this.durationSlider.addEventListener('input', () => this.updateMarkersPosition());
+        this.durationSlider.addEventListener('input', () => this.durationSliderChange());
     }
 
     handleTimelineClick(event) {
@@ -50,7 +50,6 @@ class Rhythm {
         const marker = this.addMarker(time, x);
         this.timelineElement.appendChild(marker);
         this.markers.push(marker);
-        this.updateDuration();
         this.updateMarkerList();
     }
 
@@ -138,9 +137,9 @@ class Rhythm {
         return `${minutes}:${Math.floor(secs).toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
     }
 
-    updateDuration() {
-        const max = Math.max(...this.markers.map(m => parseFloat(m.dataset.time)), 0);
-        this.durationDisplay.textContent = this.formatTime(max);
+    durationSliderChange() {
+        this.durationDisplay.textContent = this.formatTime(this.durationSlider.value);
+        this.updateMarkersPosition();
     }
 
     updateMarkersPosition() {
@@ -150,7 +149,6 @@ class Rhythm {
             const time = parseFloat(marker.dataset.time);
             marker.style.left = `${(time / maxDuration) * rect.width}px`;
         });
-        this.updateDuration();
         this.updateMarkerList();
     }
 
