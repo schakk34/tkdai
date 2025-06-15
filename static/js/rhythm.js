@@ -21,7 +21,7 @@ class Rhythm {
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         this.isPlaying = false;
         this.suppressNextClick = false;
-        this.playTimeout = null;
+        this.scheduledOscillators = [];
         this.bindEvents();
     }
 
@@ -172,40 +172,54 @@ class Rhythm {
     }
 
     startPlayback() {
-        this.stopPlayback();
+        this.stop();
         this.isPlaying = true;
-        const sorted = [...this.markers].sort((a, b) => parseFloat(a.dataset.time) - parseFloat(b.dataset.time));
+
         const duration = parseFloat(this.durationSlider.value);
         const startTime = this.audioContext.currentTime;
-        let index = 0;
+        const sorted = [...this.markers].sort((a, b) => parseFloat(a.dataset.time) - parseFloat(b.dataset.time));
 
-        const playNext = () => {
-            if (!this.isPlaying || index >= sorted.length) return;
+        sorted.forEach(marker => {
+            const markerTime = parseFloat(marker.dataset.time);
+            const clickTime = startTime + markerTime;
+            this.scheduleClickSound(clickTime);
+        });
 
-            const currMarkerTime = parseFloat(sorted[index].dataset.time);
-            index++;
-            const nextTime = index < sorted.length ? parseFloat(sorted[index].dataset.time) - currMarkerTime : duration - currMarkerTime;
+        // Animate indicator
+        this.animatePlaybackIndicator(startTime, duration);
 
-            this.playTimeout = setTimeout(() => {
-                if (this.isPlaying) playNext();
-            }, nextTime * 1000);
+        // Repeat
+        this.loopTimeout = setTimeout(() => {
+            if (this.isPlaying) this.startPlayback(); // seamless loop
+        }, duration * 1000);
+    }
 
-            this.clickSound();
-            this.animateIndicator(startTime, duration);
-        };
+    stop() {
+        this.isPlaying = false;
+        clearTimeout(this.loopTimeout);
+        this.scheduledOscillators.forEach(osc => {
+            try { osc.stop(); } catch (_) {}
+        });
+        this.scheduledOscillators = [];
+        this.playbackIndicator.style.left = '0px';
+    }
 
-        playNext();
-    } // come back to
+    animatePlaybackIndicator(startTime, duration) {
+        const indicator = this.playbackIndicator;
+        const timelineWidth = this.timelineElement.offsetWidth;
 
-    animateIndicator(startTime, duration) {
-        const step = () => {
+        const animate = () => {
             if (!this.isPlaying) return;
-            const elapsed = this.audioContext.currentTime - startTime;
-            const progress = (elapsed / duration) * this.timelineElement.offsetWidth;
-            this.playbackIndicator.style.left = `${progress}px`;
-            if (elapsed < duration) requestAnimationFrame(step);
+            const now = this.audioContext.currentTime;
+            const elapsed = (now - startTime) % duration;
+
+            const progress = elapsed / duration;
+            indicator.style.left = `${progress * timelineWidth}px`;
+
+            requestAnimationFrame(animate);
         };
-        requestAnimationFrame(step);
+
+        requestAnimationFrame(animate);
     }
 
     scheduleClickSound(timeInFuture) {
@@ -221,12 +235,8 @@ class Rhythm {
 
         osc.start(timeInFuture);
         osc.stop(timeInFuture + 0.05);
-    }
 
-    stop() {
-        this.isPlaying = false;
-        clearTimeout(this.playTimeout);
-        this.playbackIndicator.style.left = '0px';
+        this.scheduledOscillators.push(osc);
     }
 
     clearMarkers() {
