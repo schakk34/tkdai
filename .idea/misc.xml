@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="startup" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="startup" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="tkdai" project-jdk-type="Python SDK" />
 </project>

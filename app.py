@@ -1,25 +1,23 @@
-from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, session, send_file
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
-from capture import Capture
-from PracticeStudio import PracticeStudio
-from white_belt_form import WhiteBeltForm
-from functools import wraps
 import os
-from datetime import datetime
-import cv2
-from form_comparison import FormComparison
-from werkzeug.utils import secure_filename
-import time
+import os.path
 import subprocess
-from form_analyzer import FormAnalyzer
-from models import db, LibraryItem
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+import time
+from datetime import datetime
+
+import cv2
 import requests
 from bs4 import BeautifulSoup
-import json
-from datetime import datetime, timedelta
-import os.path
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+
+from PracticeStudio import PracticeStudio
+from capture import Capture
+from form_analyzer import FormAnalyzer
+from form_comparison import FormComparison
+from models import db, LibraryItem
+from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
