@@ -1,186 +1,351 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - TKD AI</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        #chart-container {
-            height: 600px
-        }
-        .technique-card {
-            transition: transform 0.3s;
-            cursor: pointer;
-        }
-        .technique-card:hover {
-            transform: translateY(-5px);
-        }
-        .progress-chart {
-            height: 300px;
-        }
-        .belt-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            color: white;
-            background-color: #dc3545;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">TKD AI</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/dashboard">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/practice">Practice Studio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/rhythm">Rhythm</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/progress">Progress</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout">Logout</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <div class="container py-5">
-        <!-- User Info -->
-        <div class="row mb-5">
-            <div class="col-md-8">
-                <h1>Welcome, {{ user.username }}!</h1>
-                <p class="lead">Keep training and improving your techniques.</p>
-            </div>
-            <div class="col-md-4 text-end">
-                <span class="belt-badge">{{ user.belt_rank }}</span>
-            </div>
-        </div>
+{% block title %}Dashboard - TKD AI{% endblock %}
 
-        <!-- Quick Stats -->
-        <div class="row mb-5">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-clock fa-2x text-danger mb-3"></i>
-                        <h5 class="card-title">Training Time</h5>
-                        <p class="card-text display-6">2.5 hrs</p>
-                        <p class="text-muted">This week</p>
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">Welcome, {{ user.username }}!</h1>
+            
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="row">
+                <!-- Practice Studio Card -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-dumbbell me-2"></i>Practice Studio
+                            </h5>
+                            <p class="card-text">Practice your techniques with real-time feedback.</p>
+                            <a href="{{ url_for('practice') }}" class="btn btn-primary">Start Practice</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rhythm Card -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-music me-2"></i>Rhythm
+                            </h5>
+                            <p class="card-text">Create and practice with custom metronomes.</p>
+                            <a href="{{ url_for('rhythm') }}" class="btn btn-primary">Open Rhythm</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Form Comparison Card -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-video me-2"></i>Form Comparison
+                            </h5>
+                            <p class="card-text">Compare your form with ideal techniques.</p>
+                            <a href="{{ url_for('form_comparison') }}" class="btn btn-primary">Compare Form</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Library Card -->
+                <div class="col-md-3 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-book me-2"></i>My Library
+                            </h5>
+                            <p class="card-text">Access your saved videos and metronomes.</p>
+                            <a href="{{ url_for('library') }}" class="btn btn-primary">View Library</a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-fire fa-2x text-danger mb-3"></i>
-                        <h5 class="card-title">Techniques Practiced</h5>
-                        <p class="card-text display-6">15</p>
-                        <p class="text-muted">This week</p>
+            
+            <!-- WT Calendar and Events Section -->
+            <div class="row mt-4">
+                <!-- Activity Calendar -->
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-check me-2"></i>Your Activity
+                            </h5>
+                            <div id="calendar"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- WT Events -->
+                <div class="col-md-7">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-alt me-2"></i>World Taekwondo Events
+                            </h5>
+                            {% if wt_events %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Event</th>
+                                                <th>Date</th>
+                                                <th>Location</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for event in wt_events %}
+                                                <tr>
+                                                    <td>{{ event.name }}</td>
+                                                    <td>{{ event.date }}</td>
+                                                    <td>{{ event.location }}</td>
+                                                    <td>
+                                                        {% if event.link %}
+                                                            <a href="{{ event.link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-external-link-alt me-1"></i>Details
+                                                            </a>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No upcoming events found.</p>
+                            {% endif %}
+                            <a href="https://www.worldtaekwondo.org/calendar/cld_index.html" target="_blank" class="btn btn-outline-primary mt-3">
+                                <i class="fas fa-external-link-alt me-1"></i>View Full Calendar
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-star fa-2x text-danger mb-3"></i>
-                        <h5 class="card-title">Average Score</h5>
-                        <p class="card-text display-6">85%</p>
-                        <p class="text-muted">This week</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Training Options -->
-        <h2 class="mb-4">Training Options</h2>
-        <div class="row g-4">
-            <div class="col-md-4">
-                <div class="card technique-card" onclick="window.location.href='/front-kick'">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="fas fa-shoe-prints text-danger me-2"></i>Front Kick</h5>
-                        <p class="card-text">Practice your front kick technique with real-time feedback.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card technique-card" onclick="window.location.href='/roundhouse-kick'">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="fas fa-sync text-danger me-2"></i>Roundhouse Kick</h5>
-                        <p class="card-text">Master the roundhouse kick with AI guidance.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card technique-card" onclick="window.location.href='/basic-punches'">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="fas fa-fist-raised text-danger me-2"></i>Basic Punches</h5>
-                        <p class="card-text">Perfect your punching techniques.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card technique-card" onclick="window.location.href='/poomsae'">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="fas fa-running text-danger me-2"></i>Poomsae</h5>
-                        <p class="card-text">Practice traditional Taekwondo forms.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Progress Chart -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div id='chart-container' class="card-body">
-                        <h5 class="card-title">Your Progress</h5>
-                        <canvas id="progressChart" class="progress-chart"></canvas>
+            
+            <!-- Progress Section -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-line me-2"></i>Your Progress
+                            </h5>
+                            <p class="card-text">Current Belt Rank: {{ user.belt_rank }}</p>
+                            <a href="{{ url_for('progress') }}" class="btn btn-outline-primary">View Progress</a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Sample progress chart
-        const ctx = document.getElementById('progressChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    label: 'Performance Score',
-                    data: [75, 78, 80, 79, 85, 83, 85],
-                    borderColor: '#dc3545',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
+<!-- Add FullCalendar CSS and JS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        console.log('Initializing calendar...');
+        var calendarEl = document.getElementById('calendar');
+        if (!calendarEl) {
+            console.error('Calendar element not found!');
+            return;
+        }
+        
+        // Sample data for testing
+        var sampleEvents = [
+            {
+                title: 'Logged in',
+                start: new Date(),
+                allDay: true
             }
+        ];
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth'
+            },
+            events: function(info, successCallback, failureCallback) {
+                // First show sample data
+                successCallback(sampleEvents);
+                
+                // Then fetch real data
+                fetch('/get_user_activity')
+                    .then(response => response.json())
+                    .then(data => {
+                        successCallback(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching events:', error);
+                        failureCallback(error);
+                    });
+            },
+            eventColor: '#dc3545',
+            eventDisplay: 'background',
+            height: 'auto',
+            contentHeight: 'auto',
+            dayMaxEvents: true,
+            displayEventTime: false
         });
-    </script>
-</body>
-</html> 
+        
+        console.log('Calendar created, rendering...');
+        calendar.render();
+        console.log('Calendar rendered successfully');
+    } catch (error) {
+        console.error('Error initializing calendar:', error);
+    }
+});
+</script>
+
+<style>
+    #chart-container {
+        height: 600px
+    }
+    .technique-card {
+        transition: transform 0.3s;
+        cursor: pointer;
+    }
+    .technique-card:hover {
+        transform: translateY(-5px);
+    }
+    .progress-chart {
+        height: 300px;
+    }
+    .belt-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        color: white;
+        background-color: #dc3545;
+    }
+    .table {
+        margin-bottom: 0;
+    }
+    .table th {
+        border-top: none;
+        color: var(--primary-color);
+    }
+    .table td {
+        vertical-align: middle;
+    }
+    #calendar {
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+        background: white;
+    }
+    .fc {
+        max-width: 100%;
+        background: white;
+    }
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem !important;
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.2em !important;
+        margin: 0;
+        color: #dc3545;
+    }
+    .fc .fc-button {
+        padding: 0.2em 0.4em;
+        font-size: 0.9em;
+    }
+    .fc .fc-button-primary {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+    }
+    .fc .fc-button-primary:hover {
+        background-color: #bb2d3b !important;
+        border-color: #bb2d3b !important;
+    }
+    .fc .fc-button-primary:disabled {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+        opacity: 0.65;
+    }
+    .fc .fc-view-harness {
+        height: auto !important;
+    }
+    .fc .fc-daygrid-day-frame {
+        min-height: 60px;
+    }
+    .fc .fc-daygrid-day {
+        min-height: 60px;
+    }
+    .fc .fc-daygrid-day-number {
+        padding: 2px;
+        color: #495057;
+        font-size: 0.9em;
+    }
+    .fc .fc-day-today {
+        background-color: #fff5f5 !important;
+    }
+    .fc .fc-day-today .fc-daygrid-day-number {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .fc .fc-day-other {
+        background-color: #f8f9fa;
+    }
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #fff5f5 !important;
+    }
+    .fc .fc-event {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+    }
+    .fc .fc-event:hover {
+        background-color: #bb2d3b !important;
+        border-color: #bb2d3b !important;
+    }
+    .fc .fc-col-header-cell {
+        background-color: #f8f9fa;
+    }
+    .fc .fc-col-header-cell-cushion {
+        color: #dc3545;
+        font-weight: bold;
+        text-decoration: none;
+        padding: 4px;
+        font-size: 0.9em;
+    }
+    .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+        background-color: #dc3545;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9em;
+    }
+    .fc .fc-scrollgrid {
+        border: none !important;
+    }
+    .fc .fc-scrollgrid-section > * {
+        border: none !important;
+    }
+    .fc .fc-daygrid-body {
+        width: 100% !important;
+    }
+    .fc .fc-daygrid-day-frame {
+        padding: 2px;
+    }
+</style>
+{% endblock %} 
