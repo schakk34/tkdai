@@ -172,6 +172,7 @@ class Rhythm {
     }
 
     startPlayback() {
+        this.stopPlayback();
         this.isPlaying = true;
         const sorted = [...this.markers].sort((a, b) => parseFloat(a.dataset.time) - parseFloat(b.dataset.time));
         const duration = parseFloat(this.durationSlider.value);
@@ -180,15 +181,16 @@ class Rhythm {
 
         const playNext = () => {
             if (!this.isPlaying || index >= sorted.length) return;
-            const time = parseFloat(sorted[index].dataset.time);
-            this.clickSound();
+
+            const currMarkerTime = parseFloat(sorted[index].dataset.time);
             index++;
-            const nextTime = index < sorted.length ? parseFloat(sorted[index].dataset.time) - time : duration - time;
+            const nextTime = index < sorted.length ? parseFloat(sorted[index].dataset.time) - currMarkerTime : duration - currMarkerTime;
 
             this.playTimeout = setTimeout(() => {
                 if (this.isPlaying) playNext();
             }, nextTime * 1000);
 
+            this.clickSound();
             this.animateIndicator(startTime, duration);
         };
 
@@ -198,24 +200,27 @@ class Rhythm {
     animateIndicator(startTime, duration) {
         const step = () => {
             if (!this.isPlaying) return;
-            const elapsed = this.audioCtx.currentTime - startTime;
-            const progress = (elapsed / duration) * this.timelineEl.offsetWidth;
+            const elapsed = this.audioContext.currentTime - startTime;
+            const progress = (elapsed / duration) * this.timelineElement.offsetWidth;
             this.playbackIndicator.style.left = `${progress}px`;
             if (elapsed < duration) requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
     }
 
-    clickSound() {
+    scheduleClickSound(timeInFuture) {
         const osc = this.audioContext.createOscillator();
         const gain = this.audioContext.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1000, timeInFuture);
+        gain.gain.setValueAtTime(0.1, timeInFuture);
+
         osc.connect(gain);
         gain.connect(this.audioContext.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1000, this.audioContext.currentTime);
-        gain.gain.setValueAtTime(0.1, this.audioContext.currentTime);
-        osc.start();
-        osc.stop(this.audioContext.currentTime + 0.1);
+
+        osc.start(timeInFuture);
+        osc.stop(timeInFuture + 0.05);
     }
 
     stop() {
