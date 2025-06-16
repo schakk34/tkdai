@@ -600,7 +600,6 @@ def save_to_library():
             filename = os.path.basename(file_path)
             file_path = url_for('serve_upload', filename=filename, _external=True)
             print(f"Converted file path to URL: {file_path}")  # Debug log
-        print("hi")
         # Create new library item
         item = LibraryItem(
             user_id=current_user.id,
@@ -675,8 +674,10 @@ def get_user_activity():
 def serve_upload(filename):
     try:
         # Ensure the file is within the uploads directory
-        upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
+        upload_dir = app.config['UPLOAD_FOLDER']
         file_path = os.path.join(upload_dir, filename)
+        print(upload_dir)
+        print(filename)
         
         print(f"Attempting to serve file: {file_path}")  # Debug log
         

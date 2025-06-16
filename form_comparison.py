@@ -217,7 +217,9 @@ class FormComparison:
                             )
                             
                             # Update ideal frame index
-                            ideal_frame_index = (ideal_frame_index + 1) % len(self.ideal_data['pose_data'])
+                            ideal_frame_index += 1
+                            if ideal_frame_index >= len(self.ideal_data['pose_data']):
+                                break
                 
                 # Add frame number
                 cv2.putText(frame, f"Frame: {frame_count}", (10, 30),
