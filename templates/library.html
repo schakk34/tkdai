@@ -56,6 +56,11 @@
         background: #f8f9fa;
         border-radius: 4px;
     }
+    .library-tab {
+        color: #212529 !important;
+    }.library-tab:hover {
+        color: #7d7f7c !important;
+    }
 </style>
 {% endblock %}
 
@@ -66,12 +71,12 @@
     <!-- Tabs -->
     <ul class="nav nav-tabs tabs" id="libraryTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos" type="button" role="tab">
+            <button class="nav-link library-tab active" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos" type="button" role="tab">
                 <i class="fas fa-video me-2"></i>Videos
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="rhythms-tab" data-bs-toggle="tab" data-bs-target="#rhythms" type="button" role="tab">
+            <button class="nav-link library-tab" id="rhythms-tab" data-bs-toggle="tab" data-bs-target="#rhythms" type="button" role="tab">
                 <i class="fas fa-music me-2"></i>Rhythms
             </button>
         </li>
