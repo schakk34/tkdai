@@ -39,6 +39,20 @@ class FormComparison:
             thickness=2,
             circle_radius=2
         )
+
+        raw = json.load(open(ideal_data_path))
+        self.pose_data = raw['pose_data']
+
+        # each frame’s timestamp in seconds
+        self.ideal_timestamps = np.array([f['timestamp'] for f in self.pose_data])
+
+        # each frame F, N landmarks, (x,y,z,visibility)
+        self.ideal_landmarks = np.array([
+            [[lm['x'], lm['y'], lm['z'], lm['visibility']]
+             for lm in f['landmarks']]
+            for f in self.pose_data
+        ])
+        print("hi")
     
     def is_valid_point(self, x, y, frame_shape):
         """Check if a point is within the frame bounds."""
@@ -82,6 +96,36 @@ class FormComparison:
             })
             
         return aligned_ideal
+
+    def get_aligned_ideal(self, t_sec, user_landmarks):
+        """
+        t_sec: float, seconds into the user video
+        user_landmarks: list of dicts (for visibility & shape reference)
+        returns: list of aligned landmark dicts
+        """
+        # 1. Find bracketing frames
+        idx = np.searchsorted(self.ideal_timestamps, t_sec)
+
+        if idx <= 0:
+            interp = self.ideal_landmarks[0]
+        elif idx >= len(self.ideal_timestamps):
+            interp = self.ideal_landmarks[-1]
+        else:
+            t0, t1 = self.ideal_timestamps[idx - 1], self.ideal_timestamps[idx]
+            # weight of relative distance from t1 to t2
+            w = (t_sec - t0) / (t1 - t0)
+            L0 = self.ideal_landmarks[idx - 1]  # (N,4)
+            L1 = self.ideal_landmarks[idx]
+            # weighted average of poses
+            interp = (1 - w) * L0 + w * L1  # (N,4) float array
+
+        # 2. Convert interp into same dict list your align_poses expects:
+        ideal_lms = [
+            {'x': float(x), 'y': float(y), 'z': float(z), 'visibility': float(v)}
+            for x, y, z, v in interp
+        ]
+        # 3. Now call your existing align_poses:
+        return self.align_poses(user_landmarks, ideal_lms)
     
     def draw_landmarks(self, frame, landmarks, color):
         """Draw landmarks using OpenCV."""
@@ -183,43 +227,42 @@ class FormComparison:
                         })
                     
                     # Get corresponding ideal frame
-                    if ideal_frame_index < len(self.ideal_data['pose_data']):
-                        ideal_frame = self.ideal_data['pose_data'][ideal_frame_index]
-                        ideal_landmarks = ideal_frame['landmarks']
+                    t_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
+                    t_sec = t_msec / 1000.0
+
+                    # 2) Interpolate & align the ideal pose at this time
+                    aligned_ideal = self.get_aligned_ideal(t_sec, user_landmarks)
                         
-                        # Align ideal pose with user
-                        aligned_ideal = self.align_poses(user_landmarks, ideal_landmarks)
-                        
-                        if aligned_ideal:
-                            # Draw user pose in red
-                            self.mp_drawing.draw_landmarks(
-                                frame,
-                                results.pose_landmarks,
-                                self.mp_pose.POSE_CONNECTIONS,
-                                self.user_drawing_spec
-                            )
-                            
-                            # Create MediaPipe landmarks for aligned ideal pose
-                            ideal_landmarks_mp = landmark_pb2.NormalizedLandmarkList()
-                            for lm in aligned_ideal:
-                                landmark = ideal_landmarks_mp.landmark.add()
-                                landmark.x = lm['x']
-                                landmark.y = lm['y']
-                                landmark.z = lm['z']
-                                landmark.visibility = lm['visibility']
-                            
-                            # Draw aligned ideal pose in green
-                            self.mp_drawing.draw_landmarks(
-                                frame,
-                                ideal_landmarks_mp,
-                                self.mp_pose.POSE_CONNECTIONS,
-                                self.ideal_drawing_spec
-                            )
-                            
-                            # Update ideal frame index
-                            ideal_frame_index += 1
-                            if ideal_frame_index >= len(self.ideal_data['pose_data']):
-                                break
+                    if aligned_ideal:
+                        # Draw user pose in red
+                        self.mp_drawing.draw_landmarks(
+                            frame,
+                            results.pose_landmarks,
+                            self.mp_pose.POSE_CONNECTIONS,
+                            self.user_drawing_spec
+                        )
+
+                        # Create MediaPipe landmarks for aligned ideal pose
+                        ideal_landmarks_mp = landmark_pb2.NormalizedLandmarkList()
+                        for lm in aligned_ideal:
+                            landmark = ideal_landmarks_mp.landmark.add()
+                            landmark.x = lm['x']
+                            landmark.y = lm['y']
+                            landmark.z = lm['z']
+                            landmark.visibility = lm['visibility']
+
+                        # Draw aligned ideal pose in green
+                        self.mp_drawing.draw_landmarks(
+                            frame,
+                            ideal_landmarks_mp,
+                            self.mp_pose.POSE_CONNECTIONS,
+                            self.ideal_drawing_spec
+                        )
+
+                        # Update ideal frame index
+                        ideal_frame_index += 1
+                        if ideal_frame_index >= len(self.ideal_data['pose_data']):
+                            break
                 
                 # Add frame number
                 cv2.putText(frame, f"Frame: {frame_count}", (10, 30),

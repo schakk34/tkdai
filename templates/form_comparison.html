@@ -324,8 +324,22 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             method: 'POST',
             body: formData
         });
+
+        if (!response.ok) {
+            // Try to parse JSON error, or fallback to text
+            let err;
+            try {
+                const errData = await response.json();
+                err = errData.error || 'Upload failed';
+            } catch {
+                err = await response.text();
+            }
+            alert(err);
+            return;
+        }
         
         const data = await response.json();
+        console.log(data)
         
         if (data.success) {
             const resultVideo = document.getElementById('resultVideo');

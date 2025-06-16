@@ -24,7 +24,7 @@ app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 16MB max file size
 
 # Initialize database
 db.init_app(app)
@@ -448,31 +448,32 @@ def form_comparison():
 def process_form_comparison():
     if 'video' not in request.files:
         return jsonify({'error': 'No video file provided'}), 400
-        
+
     video_file = request.files['video']
     rhythm_file = request.files.get('rhythm')
     form_type = request.form.get('formType')
-    
+
     if not video_file or not form_type:
         return jsonify({'error': 'Missing required fields'}), 400
-        
+
+
     # Create user-specific upload directory
     user_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
     os.makedirs(user_upload_dir, exist_ok=True)
-    
+
     try:
         # Save uploaded files with timestamps
         timestamp = int(time.time())
-        
+
         # Save video file
         video_filename = secure_filename(f"{form_type}_user_{timestamp}.webm")
         video_path = os.path.join(user_upload_dir, video_filename)
         video_file.save(video_path)
-        
+
         # Convert webm to mp4 using ffmpeg with specific codec settings
         mp4_filename = f"{form_type}_user_{timestamp}.mp4"
         mp4_path = os.path.join(user_upload_dir, mp4_filename)
-        
+
         # Use ffmpeg to convert the video with specific settings for web compatibility
         subprocess.run([
             'ffmpeg', '-i', video_path,
@@ -486,46 +487,46 @@ def process_form_comparison():
             '-movflags', '+faststart',  # Enable fast start for web playback
             mp4_path
         ], check=True)
-        
+
         # Remove the original webm file
         os.remove(video_path)
-        
+
         # Process rhythm file if provided
         rhythm_path = None
         if rhythm_file and allowed_file(rhythm_file.filename):
             rhythm_filename = secure_filename(f"{form_type}_rhythm_{timestamp}.mp3")
             rhythm_path = os.path.join(user_upload_dir, rhythm_filename)
             rhythm_file.save(rhythm_path)
-        
+
         # Process the video
         output_filename = f"{form_type}_comparison_{timestamp}.mp4"
         output_path = os.path.join(user_upload_dir, output_filename)
-        
+
         # Check if ideal data exists
         ideal_data_path = f'static/{form_type}_ideal_data.json'
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type} form'}), 400
-        
+
         comparator = FormComparison(ideal_data_path=ideal_data_path)
         success = comparator.process_user_video(
             user_video_path=mp4_path,
             output_path=output_path,
             audio_path=rhythm_path
         )
-        
+
         if success:
             # Clean up intermediate files
             os.remove(mp4_path)
             if rhythm_path:
                 os.remove(rhythm_path)
-                
+
             return jsonify({
                 'success': True,
                 'video_url': f'/static/uploads/{current_user.id}/{output_filename}'
             })
         else:
             return jsonify({'error': 'Failed to process video'}), 500
-            
+
     except subprocess.CalledProcessError as e:
         print(f"Error converting video: {str(e)}")
         return jsonify({'error': 'Failed to convert video format'}), 500
