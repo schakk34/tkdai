@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import time
 
-class KoryoDataExtractor:
-    def __init__(self, video_path):
+class FormDataExtractor:
+    def __init__(self, video_path, form_name):
         self.video_path = video_path
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
@@ -15,6 +15,7 @@ class KoryoDataExtractor:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
+        self.form_name = form_name
         
     def process_video(self):
         cap = cv2.VideoCapture(str(self.video_path))
@@ -81,18 +82,18 @@ class KoryoDataExtractor:
         return True
         
     def save_data(self, data):
-        output_path = Path('static/koryo_ideal_data.json')
+        output_path = Path(f'static/form_data/{self.form_name}_ideal_data.json')
         with open(output_path, 'w') as f:
             json.dump(data, f, indent=2)
         print(f"Saved pose data to {output_path}")
 
 def main():
-    video_path = Path('static/koreoideal.mp4')
+    video_path = Path('data/forms/videos/koryo_ideal.mp4')
     if not video_path.exists():
         print(f"Error: Video file not found at {video_path}")
         return
         
-    extractor = KoryoDataExtractor(video_path)
+    extractor = FormDataExtractor(video_path)
     if extractor.process_video():
         print("Successfully processed video and extracted pose data")
     else:

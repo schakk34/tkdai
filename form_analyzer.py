@@ -25,7 +25,7 @@ class FormAnalyzer:
         
         # Load ideal form data
         try:
-            with open('static/koryo_ideal_data.json', 'r') as f:
+            with open('data/forms/pose_data/koryo_ideal_data.json', 'r') as f:
                 self.ideal_data = json.load(f)
             print("Successfully loaded ideal form data")
         except Exception as e:
