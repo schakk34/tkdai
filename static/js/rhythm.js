@@ -1,5 +1,5 @@
 window.addEventListener('DOMContentLoaded', () => {
-    new Rhythm(
+    const rhythm = new Rhythm(
         document.getElementById('rhythmTimeline'),
         document.getElementById('durationSlider'),
         document.getElementById('playbackIndicator'),
@@ -7,6 +7,12 @@ window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('duration'),
         document.getElementById('countdown')
     );
+    const loaded = localStorage.getItem('loadedRhythm');
+    if (loaded) {
+        const { title, markers } = JSON.parse(loaded);
+        rhythm.loadSavedRhythm(markers);
+        localStorage.removeItem('loadedRhythm');
+    }
 });
 
 class Rhythm {
@@ -307,6 +313,19 @@ class Rhythm {
         this.updateMarkerList();
     }
 
-
+    loadSavedRhythm(markers) {
+        this.clear();
+        const duration = Math.max(...markers) + 1;
+        this.durationSlider.value = duration;
+        const rect = this.timelineElement.getBoundingClientRect();
+        markers.forEach(time => {
+            const left = (time / duration) * rect.width;
+            const marker = this.addMarker(time, left);
+            this.timelineElement.appendChild(marker);
+            this.markers.push(marker);
+        });
+        this.durationSliderChange();
+        this.updateMarkerList();
+    }
 
 }
