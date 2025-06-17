@@ -88,7 +88,7 @@ class FormDataExtractor:
         print(f"Saved pose data to {output_path}")
 
 def main():
-    video_path = Path('data/forms/videos/koryo_ideal.mp4')
+    video_path = Path('static/data/forms/videos/koryo_ideal.mp4')
     if not video_path.exists():
         print(f"Error: Video file not found at {video_path}")
         return

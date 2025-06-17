@@ -16,7 +16,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from form_analyzer import FormAnalyzer
 from form_comparison import FormComparison
-from models import db, LibraryItem
+from models import db, LibraryItem, User, Progress, UserActivity
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -38,46 +38,7 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Update User model to work with Flask-Login
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    belt_rank = db.Column(db.String(20), default='White Belt')
-    progress = db.relationship('Progress', backref='user', lazy=True)
-    library_items = db.relationship('LibraryItem', backref='user', lazy=True)
 
-    def is_authenticated(self):
-        return True
-
-    def is_active(self):
-        return True
-
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return str(self.id)
-
-# Progress tracking model
-class Progress(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    technique = db.Column(db.String(50), nullable=False)
-    score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.DateTime, nullable=False)
-
-# Add this after the Progress model
-class UserActivity(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    activity_date = db.Column(db.Date, nullable=False)
-    activity_type = db.Column(db.String(50), nullable=False, default='login')
-    
-    __table_args__ = (
-        db.UniqueConstraint('user_id', 'activity_date', 'activity_type', name='unique_user_activity'),
-    )
 
 camera = None
 practice_studio = None
@@ -503,16 +464,18 @@ def process_form_comparison():
         output_path = os.path.join(user_upload_dir, output_filename)
 
         # Check if ideal data exists
-        ideal_data_path = f'static/{form_type}_ideal_data.json'
+        ideal_data_path = f'static/data/forms/pose_data/{form_type}_ideal_data.json'
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type} form'}), 400
 
         comparator = FormComparison(ideal_data_path=ideal_data_path)
-        success = comparator.process_user_video(
+        success, all_feature_vectors = comparator.process_user_video(
             user_video_path=mp4_path,
             output_path=output_path,
             audio_path=rhythm_path
         )
+
+        print([vector['overall_score'] for vector in all_feature_vectors])
 
         if success:
             # Clean up intermediate files

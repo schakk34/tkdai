@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeVideoClip, ImageSequenceClip
 from mediapipe.framework.formats import landmark_pb2
+from metrics import joint_errors, angle_errors, build_feature_vector
 
 class FormComparison:
     def __init__(self, ideal_data_path='koryo_ideal_data.json'):
@@ -190,7 +191,7 @@ class FormComparison:
             cap = cv2.VideoCapture(str(user_video_path))
             if not cap.isOpened():
                 print(f"❌ Error: Could not open user video: {user_video_path}")
-                return False
+                return False, _
                 
             # Get video properties
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -205,7 +206,12 @@ class FormComparison:
             ideal_frame_index = 0
             
             print("🔍 Processing user video...")
-            
+
+            all_feature_vectors = []
+
+            SELECTED_JOINTS = ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip', 'left_knee', 'right_knee']
+            SELECTED_ANGLES = ['left_knee', 'right_knee', 'left_elbow', 'right_elbow']
+
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
@@ -263,7 +269,22 @@ class FormComparison:
                         ideal_frame_index += 1
                         if ideal_frame_index >= len(self.ideal_data['pose_data']):
                             break
-                
+
+                        user_pts_arr = np.array([[lm['x'], lm['y']] for lm in user_landmarks])
+                        ideal_pts_arr = np.array([[lm['x'], lm['y']] for lm in aligned_ideal])
+
+                        # 2) Compute joint & angle errors
+                        j_errs = joint_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_JOINTS)
+                        a_errs = angle_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_ANGLES)
+
+                        # 3) Build your timestamp (in seconds) and package into a feature vector
+                        t_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
+                        t_sec = t_msec / 1000.0
+                        fv = build_feature_vector(t_sec, j_errs, a_errs)
+
+                        # 4) Append to the list
+                        all_feature_vectors.append(fv)
+
                 # Add frame number
                 cv2.putText(frame, f"Frame: {frame_count}", (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -285,7 +306,7 @@ class FormComparison:
             
             if not processed_frames:
                 print("No frames were processed successfully")
-                return False
+                return False, _
             
             # Create video from processed frames
             print("Creating video from processed frames...")
@@ -317,11 +338,11 @@ class FormComparison:
                 audio.close()
             
             print(f"✅ Comparison video saved to {output_path}")
-            return True
+            return True, all_feature_vectors
             
         except Exception as e:
             print(f"Error processing video: {str(e)}")
-            return False
+            return False, _
 
 def main():
     print("\n=== Starting Form Comparison ===")

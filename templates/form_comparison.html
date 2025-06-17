@@ -177,7 +177,7 @@ async function setupCamera() {
         preview.srcObject = stream;
         
         // Setup audio element with error handling
-        audioElement = new Audio('/static/pianokoreo.m4a');
+        audioElement = new Audio('/static/data/forms/misc/pianokoreo.m4a');
         audioElement.volume = 1.0; // Set volume to maximum
         
         // Add event listeners for audio debugging
@@ -195,7 +195,7 @@ async function setupCamera() {
         
         // Get ideal frame count
         try {
-            const response = await fetch('/static/koryo_ideal_data.json');
+            const response = await fetch('/static/data/forms/pose_data/koryo_ideal_data.json');
             const data = await response.json();
             idealFrameCount = data.pose_data.length;
             console.log(`Ideal video has ${idealFrameCount} frames`);

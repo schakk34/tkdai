@@ -27,9 +27,9 @@ class WhiteBeltForm:
         # Load reference images
         self.reference_images = {}
         for pose_name in self.pose_sequence:
-            img_path = Path('data/white_belt') / f"{pose_name}.png"
+            img_path = Path('static/data/white_belt') / f"{pose_name}.png"
             if not img_path.exists():
-                img_path = Path('data/white_belt') / f"{pose_name}.jpg"
+                img_path = Path('static/data/white_belt') / f"{pose_name}.jpg"
             if img_path.exists():
                 img = cv2.imread(str(img_path))
                 if img is not None:
