@@ -122,15 +122,9 @@ def aggregate_score(joint_errs, angle_errs, w_joint=0.6, w_angle=0.4):
     return float(np.clip(score, 0, 1))
 
 def build_feature_vector(t_sec, joint_errs, angle_errs):
-    """Build a feature vector from joint and angle errors."""
-    # Calculate average errors
-    mean_j = np.mean(list(joint_errs.values()))
-    mean_a = np.mean(list(angle_errs.values())) / 180.0  # Normalize angle errors
-    
-    # Calculate score using original weights
-    score = 1.0 - (0.6 * mean_j + 0.4 * mean_a)  # 60% joint, 40% angle weight
-    
-    # Ensure score is between 0 and 1
-    score = max(0.0, min(1.0, score))
-    
-    return score
+    return {
+      'timestamp': t_sec,
+      'joint_errors': joint_errs,
+      'angle_errors': angle_errs,
+      'overall_score': aggregate_score(joint_errs, angle_errs)
+    }

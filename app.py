@@ -511,9 +511,7 @@ def process_form_comparison():
         )
 
         # Calculate average score and convert to percentage
-        avg_score = np.mean(feature_vectors)
-        print(feature_vectors)
-        print(avg_score)
+        avg_score = np.mean([fv['overall_score'] for fv in feature_vectors])
         score_percentage = round(avg_score * 100, 1)
 
         # Calculate stars earned (1-5)
