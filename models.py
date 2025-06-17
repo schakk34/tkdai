@@ -22,6 +22,15 @@ class User(UserMixin, db.Model):
     progress = db.relationship('Progress', backref='user', lazy=True)
     library_items = db.relationship('LibraryItem', backref='user', lazy=True)
     activities = db.relationship('UserActivity', backref='user', lazy=True)
+    
+    # Specific relationships for videos and rhythms
+    videos = db.relationship('LibraryItem', 
+                           primaryjoin="and_(User.id==LibraryItem.user_id, LibraryItem.item_type=='video')",
+                           lazy=True)
+    rhythms = db.relationship('LibraryItem',
+                            primaryjoin="and_(User.id==LibraryItem.user_id, LibraryItem.item_type=='metronome')",
+                            lazy=True)
+    
     # Remove duplicate relationship definitions
     # sent_messages and received_messages are defined in the Message model
 

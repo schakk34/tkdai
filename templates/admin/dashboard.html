@@ -110,6 +110,49 @@
         </div>
     </div>
 
+    <!-- Student Libraries -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="card-title mb-0">Student Libraries</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Videos</th>
+                                    <th>Rhythms</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ user.videos|length }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ user.rhythms|length }}</span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#libraryModal{{ user.id }}">
+                                            <i class="fas fa-folder-open"></i> View Library
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Recent Activity -->
     <div class="row">
         <div class="col-md-12">
@@ -174,6 +217,80 @@
                     <button type="submit" class="btn btn-primary">Send Message</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Library Modals -->
+{% for user in users %}
+<div class="modal fade" id="libraryModal{{ user.id }}" tabindex="-1" aria-labelledby="libraryModalLabel{{ user.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="libraryModalLabel{{ user.id }}">{{ user.username }}'s Library</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="videos-tab-{{ user.id }}" data-bs-toggle="tab" data-bs-target="#videos-{{ user.id }}" type="button" role="tab" style="color: #dc3545;">
+                            <i class="fas fa-video me-2"></i>Videos ({{ user.videos|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="rhythms-tab-{{ user.id }}" data-bs-toggle="tab" data-bs-target="#rhythms-{{ user.id }}" type="button" role="tab" style="color: #dc3545;">
+                            <i class="fas fa-music me-2"></i>Rhythms ({{ user.rhythms|length }})
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Videos Tab -->
+                    <div class="tab-pane fade show active" id="videos-{{ user.id }}" role="tabpanel">
+                        <div class="row">
+                            {% for video in user.videos %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ video.title }}</h6>
+                                        <video class="w-100 mb-2" style="max-height: 200px;" controls>
+                                            <source src="{{ video.file_path }}" type="video/mp4">
+                                        </video>
+                                        <p class="card-text small text-muted">
+                                            Created: {{ video.created_at.strftime('%Y-%m-%d') }}<br>
+                                            Type: {{ video.form_type }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Rhythms Tab -->
+                    <div class="tab-pane fade" id="rhythms-{{ user.id }}" role="tabpanel">
+                        <div class="row">
+                            {% for rhythm in user.rhythms %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ rhythm.title }}</h6>
+                                        <p class="card-text">
+                                            BPM: {{ rhythm.bpm }}<br>
+                                            Markers: {{ rhythm.markers|length }}<br>
+                                            Created: {{ rhythm.created_at.strftime('%Y-%m-%d') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
