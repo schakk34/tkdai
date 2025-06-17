@@ -2,32 +2,36 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import json
+import os
 from pathlib import Path
 import time
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeVideoClip, ImageSequenceClip
 from mediapipe.framework.formats import landmark_pb2
 from metrics import joint_errors, angle_errors, build_feature_vector
+from flask import current_app
 
 class FormComparison:
-    def __init__(self, ideal_data_path='koryo_ideal_data.json'):
+    def __init__(self, ideal_data_path=None):
+        if ideal_data_path is None:
+            # Use default path in static folder
+            ideal_data_path = os.path.join(current_app.static_folder, 'data', 'forms', 'pose_data', 'koryo_ideal_data.json')
+        
+        print(f"Loading ideal pose data from {ideal_data_path}...")
+        with open(ideal_data_path, 'r') as f:
+            self.ideal_data = json.load(f)
+        print("Ideal pose data loaded successfully")
+        
+        # Initialize other attributes
+        self.mp_pose = None
+        self.mp_drawing = None
+        self.pose = None
+        
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
         self.mp_drawing = mp.solutions.drawing_utils
-        
-        # Load ideal pose data
-        print(f"Loading ideal pose data from {ideal_data_path}...")
-        with open(ideal_data_path, 'r') as f:
-            self.ideal_data = json.load(f)
-            
-        # Print diagnostic information
-        print(f"Loaded ideal pose data:")
-        print(f"- Number of frames: {len(self.ideal_data['pose_data'])}")
-        print(f"- First frame timestamp: {self.ideal_data['pose_data'][0]['timestamp']}")
-        print(f"- Last frame timestamp: {self.ideal_data['pose_data'][-1]['timestamp']}")
-        print(f"- Time duration: {self.ideal_data['pose_data'][-1]['timestamp'] - self.ideal_data['pose_data'][0]['timestamp']:.2f} seconds")
         
         # Drawing specifications
         self.ideal_drawing_spec = self.mp_drawing.DrawingSpec(
@@ -44,7 +48,7 @@ class FormComparison:
         raw = json.load(open(ideal_data_path))
         self.pose_data = raw['pose_data']
 
-        # each frame’s timestamp in seconds
+        # each frame's timestamp in seconds
         self.ideal_timestamps = np.array([f['timestamp'] for f in self.pose_data])
 
         # each frame F, N landmarks, (x,y,z,visibility)
@@ -191,7 +195,7 @@ class FormComparison:
             cap = cv2.VideoCapture(str(user_video_path))
             if not cap.isOpened():
                 print(f"❌ Error: Could not open user video: {user_video_path}")
-                return False, _
+                return None, []
                 
             # Get video properties
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -306,7 +310,7 @@ class FormComparison:
             
             if not processed_frames:
                 print("No frames were processed successfully")
-                return False, _
+                return None, []
             
             # Create video from processed frames
             print("Creating video from processed frames...")
@@ -338,11 +342,11 @@ class FormComparison:
                 audio.close()
             
             print(f"✅ Comparison video saved to {output_path}")
-            return True, all_feature_vectors
+            return output_path, all_feature_vectors
             
         except Exception as e:
             print(f"Error processing video: {str(e)}")
-            return False, _
+            return None, []
 
 def main():
     print("\n=== Starting Form Comparison ===")

@@ -4,145 +4,149 @@
 
 {% block content %}
 <div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>Welcome, {{ current_user.username }}!</h1>
+            <p class="lead">Track your progress and practice your forms</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h3 class="mb-0">
+                        <i class="fas fa-star text-warning"></i>
+                        {{ current_user.star_count }}
+                    </h3>
+                    <p class="text-muted mb-0">Total Stars Earned</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
+        <!-- Practice Studio Card -->
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-dumbbell me-2"></i>Practice Studio
+                    </h5>
+                    <p class="card-text">Practice your techniques with real-time feedback.</p>
+                    <a href="{{ url_for('practice') }}" class="btn btn-primary">Start Practice</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Rhythm Card -->
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-music me-2"></i>Rhythm
+                    </h5>
+                    <p class="card-text">Create and practice with custom metronomes.</p>
+                    <a href="{{ url_for('rhythm') }}" class="btn btn-primary">Open Rhythm</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Form Comparison Card -->
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-video me-2"></i>Form Comparison
+                    </h5>
+                    <p class="card-text">Compare your form with ideal techniques.</p>
+                    <a href="{{ url_for('form_comparison') }}" class="btn btn-primary">Compare Form</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Library Card -->
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-book me-2"></i>My Library
+                    </h5>
+                    <p class="card-text">Access your saved videos and metronomes.</p>
+                    <a href="{{ url_for('library') }}" class="btn btn-primary">View Library</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- WT Calendar and Events Section -->
+    <div class="row mt-4">
+        <!-- Activity Calendar -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-calendar-check me-2"></i>Your Activity
+                    </h5>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- WT Events -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-calendar-alt me-2"></i>World Taekwondo Events
+                    </h5>
+                    {% if wt_events %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                        <th>Date</th>
+                                        <th>Location</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in wt_events %}
+                                        <tr>
+                                            <td>{{ event.name }}</td>
+                                            <td>{{ event.date }}</td>
+                                            <td>{{ event.location }}</td>
+                                            <td>
+                                                {% if event.link %}
+                                                    <a href="{{ event.link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-external-link-alt me-1"></i>Details
+                                                    </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No upcoming events found.</p>
+                    {% endif %}
+                    <a href="https://www.worldtaekwondo.org/calendar/cld_index.html" target="_blank" class="btn btn-outline-primary mt-3">
+                        <i class="fas fa-external-link-alt me-1"></i>View Full Calendar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Progress Section -->
+    <div class="row mt-4">
         <div class="col-md-12">
-            <h1 class="mb-4">Welcome, {{ user.username }}!</h1>
-            
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-info">{{ message }}</div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-            
-            <div class="row">
-                <!-- Practice Studio Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-dumbbell me-2"></i>Practice Studio
-                            </h5>
-                            <p class="card-text">Practice your techniques with real-time feedback.</p>
-                            <a href="{{ url_for('practice') }}" class="btn btn-primary">Start Practice</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Rhythm Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-music me-2"></i>Rhythm
-                            </h5>
-                            <p class="card-text">Create and practice with custom metronomes.</p>
-                            <a href="{{ url_for('rhythm') }}" class="btn btn-primary">Open Rhythm</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Form Comparison Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-video me-2"></i>Form Comparison
-                            </h5>
-                            <p class="card-text">Compare your form with ideal techniques.</p>
-                            <a href="{{ url_for('form_comparison') }}" class="btn btn-primary">Compare Form</a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Library Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-book me-2"></i>My Library
-                            </h5>
-                            <p class="card-text">Access your saved videos and metronomes.</p>
-                            <a href="{{ url_for('library') }}" class="btn btn-primary">View Library</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- WT Calendar and Events Section -->
-            <div class="row mt-4">
-                <!-- Activity Calendar -->
-                <div class="col-md-5">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-calendar-check me-2"></i>Your Activity
-                            </h5>
-                            <div id="calendar"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- WT Events -->
-                <div class="col-md-7">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-calendar-alt me-2"></i>World Taekwondo Events
-                            </h5>
-                            {% if wt_events %}
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Event</th>
-                                                <th>Date</th>
-                                                <th>Location</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for event in wt_events %}
-                                                <tr>
-                                                    <td>{{ event.name }}</td>
-                                                    <td>{{ event.date }}</td>
-                                                    <td>{{ event.location }}</td>
-                                                    <td>
-                                                        {% if event.link %}
-                                                            <a href="{{ event.link }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                                <i class="fas fa-external-link-alt me-1"></i>Details
-                                                            </a>
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <p class="text-muted">No upcoming events found.</p>
-                            {% endif %}
-                            <a href="https://www.worldtaekwondo.org/calendar/cld_index.html" target="_blank" class="btn btn-outline-primary mt-3">
-                                <i class="fas fa-external-link-alt me-1"></i>View Full Calendar
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Progress Section -->
-            <div class="row mt-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-chart-line me-2"></i>Your Progress
-                            </h5>
-                            <p class="card-text">Current Belt Rank: {{ user.belt_rank }}</p>
-                            <a href="{{ url_for('progress') }}" class="btn btn-outline-primary">View Progress</a>
-                        </div>
-                    </div>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-line me-2"></i>Your Progress
+                    </h5>
+                    <p class="card-text">Current Belt Rank: {{ user.belt_rank }}</p>
+                    <a href="{{ url_for('progress') }}" class="btn btn-outline-primary">View Progress</a>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@ import os
 import os.path
 import subprocess
 import time
+import math
 from datetime import datetime
 from functools import wraps
 
@@ -12,6 +13,7 @@ from flask import Flask, render_template, Response, jsonify, request, redirect, 
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import numpy as np
 
 from PracticeStudio import PracticeStudio
 from capture import Capture
@@ -456,93 +458,110 @@ def form_comparison():
 def process_form_comparison():
     if 'video' not in request.files:
         return jsonify({'error': 'No video file provided'}), 400
-
+    
     video_file = request.files['video']
-    rhythm_file = request.files.get('rhythm')
     form_type = request.form.get('formType')
-
-    if not video_file or not form_type:
-        return jsonify({'error': 'Missing required fields'}), 400
-
-
-    # Create user-specific upload directory
-    user_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
-    os.makedirs(user_upload_dir, exist_ok=True)
-
+    
+    if not form_type:
+        return jsonify({'error': 'Form type not specified'}), 400
+    
+    if video_file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
     try:
-        # Save uploaded files with timestamps
-        timestamp = int(time.time())
-
-        # Save video file
-        video_filename = secure_filename(f"{form_type}_user_{timestamp}.webm")
+        # Create user-specific upload directory
+        user_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
+        os.makedirs(user_upload_dir, exist_ok=True)
+        
+        # Save the uploaded video
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        video_filename = f"{form_type}_{timestamp}.webm"
         video_path = os.path.join(user_upload_dir, video_filename)
         video_file.save(video_path)
-
-        # Convert webm to mp4 using ffmpeg with specific codec settings
-        mp4_filename = f"{form_type}_user_{timestamp}.mp4"
+        
+        # Convert webm to mp4
+        mp4_filename = f"{form_type}_{timestamp}.mp4"
         mp4_path = os.path.join(user_upload_dir, mp4_filename)
-
-        # Use ffmpeg to convert the video with specific settings for web compatibility
         subprocess.run([
-            'ffmpeg', '-i', video_path,
-            '-c:v', 'libx264',  # Use H.264 codec
-            '-preset', 'medium',  # Balance between quality and encoding speed
-            '-profile:v', 'baseline',  # Use baseline profile for maximum compatibility
-            '-level', '3.0',  # Set compatibility level
-            '-pix_fmt', 'yuv420p',  # Use standard pixel format
-            '-c:a', 'aac',  # Use AAC audio codec
-            '-b:a', '128k',  # Set audio bitrate
-            '-movflags', '+faststart',  # Enable fast start for web playback
+            'ffmpeg', '-i', video_path, 
+            '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
+            '-c:a', 'aac', '-b:a', '128k',
             mp4_path
         ], check=True)
-
-        # Remove the original webm file
-        os.remove(video_path)
-
+        
         # Process rhythm file if provided
         rhythm_path = None
-        if rhythm_file and allowed_file(rhythm_file.filename):
-            rhythm_filename = secure_filename(f"{form_type}_rhythm_{timestamp}.mp3")
+        if 'rhythm' in request.files and request.files['rhythm'].filename:
+            rhythm_file = request.files['rhythm']
+            rhythm_filename = f"{form_type}_rhythm_{timestamp}.mp3"
             rhythm_path = os.path.join(user_upload_dir, rhythm_filename)
             rhythm_file.save(rhythm_path)
-
-        # Process the video
-        output_filename = f"{form_type}_comparison_{timestamp}.mp4"
-        output_path = os.path.join(user_upload_dir, output_filename)
-
-        # Check if ideal data exists
-        ideal_data_path = f'static/data/forms/pose_data/{form_type}_ideal_data.json'
+        
+        # Check if ideal data exists for this form
+        ideal_data_path = os.path.join(app.static_folder, 'data', 'forms', 'pose_data', f'{form_type}_ideal_data.json')
         if not os.path.exists(ideal_data_path):
-            return jsonify({'error': f'No ideal data found for {form_type} form'}), 400
-
-        comparator = FormComparison(ideal_data_path=ideal_data_path)
-        success, all_feature_vectors = comparator.process_user_video(
+            return jsonify({'error': f'No ideal data found for {form_type}'}), 400
+        
+        # Process the video
+        form_comparison = FormComparison()
+        result_video_path, feature_vectors = form_comparison.process_user_video(
             user_video_path=mp4_path,
-            output_path=output_path,
+            output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),
             audio_path=rhythm_path
         )
-
-        print([vector['overall_score'] for vector in all_feature_vectors])
-
-        if success:
-            # Clean up intermediate files
-            os.remove(mp4_path)
-            if rhythm_path:
-                os.remove(rhythm_path)
-
-            return jsonify({
-                'success': True,
-                'video_url': f'/static/uploads/{current_user.id}/{output_filename}'
-            })
-        else:
-            return jsonify({'error': 'Failed to process video'}), 500
-
-    except subprocess.CalledProcessError as e:
-        print(f"Error converting video: {str(e)}")
-        return jsonify({'error': 'Failed to convert video format'}), 500
+        
+        # Calculate average score and convert to percentage
+        avg_score = np.mean(feature_vectors)
+        score_percentage = round(avg_score * 100, 1)
+        
+        # Calculate stars earned (1-5)
+        stars_earned = math.ceil((score_percentage / 100) * 5) - 1
+        
+        # Ensure minimum of 1 star
+        stars_earned = max(1, stars_earned)
+        
+        # Update user's star count
+        current_user.star_count += stars_earned
+        db.session.commit()
+        
+        # Log the activity
+        try:
+            # Check if an activity already exists for today
+            existing_activity = UserActivity.query.filter_by(
+                user_id=current_user.id,
+                activity_date=datetime.now().date(),
+                activity_type='form_practice'
+            ).first()
+            
+            if existing_activity:
+                # Update the existing activity
+                existing_activity.details = f'Practiced {form_type} form and earned {stars_earned} stars'
+            else:
+                # Create new activity
+                activity = UserActivity(
+                    user_id=current_user.id,
+                    activity_type='form_practice',
+                    details=f'Practiced {form_type} form and earned {stars_earned} stars',
+                    activity_date=datetime.now().date()
+                )
+                db.session.add(activity)
+            
+            db.session.commit()
+        except Exception as e:
+            print(f"Error logging activity: {str(e)}")
+            db.session.rollback()
+        
+        return jsonify({
+            'success': True,
+            'video_url': url_for('static', filename=f'uploads/{current_user.id}/{os.path.basename(result_video_path)}'),
+            'score': score_percentage,
+            'stars_earned': stars_earned,
+            'total_stars': current_user.star_count
+        })
+        
     except Exception as e:
-        print(f"Error processing video: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+        print(f"Error processing form comparison: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'mp3', 'wav'}

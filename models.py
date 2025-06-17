@@ -13,12 +13,17 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     belt_rank = db.Column(db.String(20), default='White')
     is_admin = db.Column(db.Boolean, default=False)
-    class_code = db.Column(db.String(8), unique=True)  # Class code for admin users
+    class_code = db.Column(db.String(10), unique=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     last_login = db.Column(db.DateTime)
+    star_count = db.Column(db.Integer, default=0)
+    
+    # Relationships
     progress = db.relationship('Progress', backref='user', lazy=True)
     library_items = db.relationship('LibraryItem', backref='user', lazy=True)
     activities = db.relationship('UserActivity', backref='user', lazy=True)
+    # Remove duplicate relationship definitions
+    # sent_messages and received_messages are defined in the Message model
 
     def is_authenticated(self):
         return True
@@ -94,9 +99,9 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     is_read = db.Column(db.Boolean, default=False)
 
-    # Relationships
-    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
-    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+    # Relationships with backrefs
+    sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('sent_messages', lazy=True))
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref=db.backref('received_messages', lazy=True))
 
     def __repr__(self):
         return f'<Message {self.id}>'
