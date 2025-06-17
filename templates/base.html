@@ -110,7 +110,7 @@
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <a class="nav-link" href="{% if current_user.is_administrator() %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('dashboard') }}{% endif %}">
                                 <i class="fas fa-home me-1"></i>Dashboard
                             </a>
                         </li>

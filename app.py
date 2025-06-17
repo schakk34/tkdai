@@ -3,6 +3,7 @@ import os.path
 import subprocess
 import time
 from datetime import datetime
+from functools import wraps
 
 import cv2
 import requests
@@ -29,6 +30,11 @@ app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 16MB max file size
 # Initialize database
 db.init_app(app)
 
+# Create database tables
+with app.app_context():
+    # Only create tables if they don't exist
+    db.create_all()
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -37,8 +43,6 @@ login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-
 
 camera = None
 practice_studio = None
@@ -99,8 +103,17 @@ def landing():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # If user is already logged in, redirect to dashboard
+    # Debug: Print all users in database
+    print("\n=== Current Users in Database ===")
+    all_users = User.query.all()
+    for user in all_users:
+        print(f"Username: {user.username}, Email: {user.email}, Is Admin: {user.is_admin}")
+    print("===============================\n")
+
+    # If user is already logged in, redirect to appropriate dashboard
     if current_user.is_authenticated:
+        if current_user.is_administrator():
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('dashboard'))
         
     if request.method == 'POST':
@@ -109,38 +122,64 @@ def login():
         
         print(f"Login attempt for username: {username}")  # Debug log
         
+        # Check if user exists
         user = User.query.filter_by(username=username).first()
         
-        if user and check_password_hash(user.password_hash, password):
-            print(f"Login successful for user: {username}")  # Debug log
-            login_user(user)
+        if user:
+            print(f"User found: {user.username}, is_admin: {user.is_admin}")  # Debug log
             
-            # Record login activity
-            today = datetime.now().date()
-            activity = UserActivity.query.filter_by(
-                user_id=user.id,
-                activity_date=today,
-                activity_type='login'
-            ).first()
-            
-            if not activity:
-                activity = UserActivity(
+            # Verify password
+            if check_password_hash(user.password_hash, password):
+                print(f"Password check passed for user: {username}")  # Debug log
+                
+                # Log in the user
+                login_user(user)
+                print(f"User logged in successfully: {username}")  # Debug log
+                
+                # Update last login time
+                user.last_login = datetime.now()
+                
+                # Record login activity
+                today = datetime.now().date()
+                activity = UserActivity.query.filter_by(
                     user_id=user.id,
                     activity_date=today,
                     activity_type='login'
-                )
-                db.session.add(activity)
+                ).first()
+                
+                if not activity:
+                    activity = UserActivity(
+                        user_id=user.id,
+                        activity_date=today,
+                        activity_type='login'
+                    )
+                    db.session.add(activity)
+                
                 db.session.commit()
-            
-            flash('Login successful!')
-            next_page = request.args.get('next')
-            if not next_page or not next_page.startswith('/'):
-                next_page = url_for('dashboard')
-            return redirect(next_page)
+                print(f"Login activity recorded for user: {username}")  # Debug log
+                
+                flash('Login successful!')
+                
+                # Determine where to redirect
+                next_page = request.args.get('next')
+                if not next_page or not next_page.startswith('/'):
+                    if user.is_administrator():
+                        print(f"Redirecting admin user {username} to admin dashboard")  # Debug log
+                        next_page = url_for('admin_dashboard')
+                    else:
+                        print(f"Redirecting regular user {username} to user dashboard")  # Debug log
+                        next_page = url_for('dashboard')
+                
+                print(f"Redirecting to: {next_page}")  # Debug log
+                return redirect(next_page)
+            else:
+                print(f"Password check failed for user: {username}")  # Debug log
+                flash('Invalid password')
         else:
-            print(f"Login failed for username: {username}")  # Debug log
-            flash('Invalid username or password')
-            return render_template('login.html')
+            print(f"No user found with username: {username}")  # Debug log
+            flash('User not found')
+            
+        return render_template('login.html')
             
     return render_template('login.html')
 
@@ -157,12 +196,20 @@ def signup():
             flash('Email already registered. Please use a different email or login.')
             return render_template('signup.html')
             
+        # Verify class code
+        class_code = request.form.get('class_code')
+        admin_user = User.query.filter_by(class_code=class_code, is_admin=True).first()
+        if not admin_user:
+            flash('Invalid class code. Please check with your instructor.')
+            return render_template('signup.html')
+            
         try:
             hashed_password = generate_password_hash(request.form['password'])
             new_user = User(
                 username=request.form['username'],
                 email=request.form['email'],
-                password_hash=hashed_password
+                password_hash=hashed_password,
+                belt_rank=request.form.get('belt_rank', 'White')
             )
             db.session.add(new_user)
             db.session.commit()
@@ -731,6 +778,107 @@ def serve_upload(filename):
     except Exception as e:
         print(f"Error serving file: {str(e)}")  # Debug log
         return str(e), 500
+
+# Add admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_administrator():
+            flash('You do not have permission to access this page.')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Add admin routes
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    # Get all users except admins
+    users = User.query.filter_by(is_admin=False).all()
+    return render_template('admin/dashboard.html', users=users)
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    users = User.query.filter_by(is_admin=False).all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/user/<int:user_id>')
+@login_required
+@admin_required
+def admin_user_detail(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot view admin user details.')
+        return redirect(url_for('admin_users'))
+    return render_template('admin/user_detail.html', user=user)
+
+@app.route('/admin/user/<int:user_id>/progress')
+@login_required
+@admin_required
+def admin_user_progress(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot view admin user progress.')
+        return redirect(url_for('admin_users'))
+    progress_data = Progress.query.filter_by(user_id=user.id).all()
+    return render_template('admin/user_progress.html', user=user, progress_data=progress_data)
+
+# Add route to create first admin user
+@app.route('/create-admin', methods=['GET', 'POST'])
+def create_admin():
+    # Check if any admin exists
+    if User.query.filter_by(is_admin=True).first():
+        flash('Admin user already exists.')
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        print(f"Attempting to create admin account for username: {username}")  # Debug log
+        
+        if User.query.filter_by(username=username).first():
+            print(f"Username {username} already exists")  # Debug log
+            flash('Username already exists.')
+            return render_template('create_admin.html')
+            
+        if User.query.filter_by(email=email).first():
+            print(f"Email {email} already registered")  # Debug log
+            flash('Email already registered.')
+            return render_template('create_admin.html')
+            
+        try:
+            # Create admin user first
+            admin_user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                is_admin=True,
+                created_at=datetime.now()
+            )
+            
+            # Generate and set class code
+            class_code = admin_user.generate_class_code()
+            print(f"Generated class code: {class_code}")  # Debug log
+            
+            # Add to session and commit
+            db.session.add(admin_user)
+            db.session.commit()
+            
+            print(f"Successfully created admin account for {username} with class code {class_code}")  # Debug log
+            flash('Admin account created successfully! Please login.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Error creating admin account: {str(e)}")  # Debug log
+            db.session.rollback()
+            flash('An error occurred while creating the admin account.')
+            return render_template('create_admin.html')
+            
+    return render_template('create_admin.html')
 
 if __name__ == '__main__':
     with app.app_context():

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - TKD AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Admin Dashboard</h1>
+        </div>
+    </div>
+
+    <!-- Class Code Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Your Class Code</h5>
+                    <p class="card-text">Share this code with your students to allow them to create accounts:</p>
+                    <div class="d-flex align-items-center">
+                        <h3 class="mb-0 me-3">{{ current_user.class_code }}</h3>
+                        <button class="btn btn-outline-primary" onclick="copyClassCode()">
+                            <i class="fas fa-copy me-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Students</h5>
+                    <p class="card-text display-4">{{ users|length }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Active Today</h5>
+                    <p class="card-text display-4">{{ users|selectattr('last_login', 'defined')|list|length }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">New This Week</h5>
+                    <p class="card-text display-4">{{ users|selectattr('created_at', 'defined')|list|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Student Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-user me-1"></i>View Details
+                                        </a>
+                                        <a href="{{ url_for('admin_user_progress', user_id=user.id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-chart-line me-1"></i>View Progress
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function copyClassCode() {
+    const classCode = "{{ current_user.class_code }}";
+    navigator.clipboard.writeText(classCode).then(() => {
+        alert('Class code copied to clipboard!');
+    });
+}
+</script>
+{% endblock %}
+{% endblock %} 

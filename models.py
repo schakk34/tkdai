@@ -1,17 +1,24 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
 # Update User model to work with Flask-Login
-class User(db.Model):
+class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    belt_rank = db.Column(db.String(20), default='White Belt')
+    password_hash = db.Column(db.String(128))
+    belt_rank = db.Column(db.String(20), default='White')
+    is_admin = db.Column(db.Boolean, default=False)
+    class_code = db.Column(db.String(8), unique=True)  # Class code for admin users
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    last_login = db.Column(db.DateTime)
     progress = db.relationship('Progress', backref='user', lazy=True)
     library_items = db.relationship('LibraryItem', backref='user', lazy=True)
+    activities = db.relationship('UserActivity', backref='user', lazy=True)
 
     def is_authenticated(self):
         return True
@@ -24,6 +31,26 @@ class User(db.Model):
 
     def get_id(self):
         return str(self.id)
+
+    def is_administrator(self):
+        return self.is_admin
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def generate_class_code(self):
+        """Generate a fixed class code"""
+        code = "WHITE-TIGER"
+        print(f"Generated code: {code}")  # Debug log
+        
+        # Set the class code
+        self.class_code = code
+        print(f"Set class code to: {self.class_code}")  # Debug log
+        
+        return code
 
 
 # Progress tracking model
