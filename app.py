@@ -17,7 +17,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from form_analyzer import FormAnalyzer
 from form_comparison import FormComparison
-from models import db, LibraryItem, User, Progress, UserActivity
+from models import db, LibraryItem, User, Progress, UserActivity, Message
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -813,7 +813,14 @@ def admin_user_detail(user_id):
     if user.is_admin:
         flash('Cannot view admin user details.')
         return redirect(url_for('admin_users'))
-    return render_template('admin/user_detail.html', user=user)
+        
+    # Get message history between admin and student
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == user.id)) |
+        ((Message.sender_id == user.id) & (Message.receiver_id == current_user.id))
+    ).order_by(Message.created_at.desc()).all()
+        
+    return render_template('admin/user_detail.html', user=user, messages=messages)
 
 @app.route('/admin/user/<int:user_id>/progress')
 @login_required
@@ -825,6 +832,89 @@ def admin_user_progress(user_id):
         return redirect(url_for('admin_users'))
     progress_data = Progress.query.filter_by(user_id=user.id).all()
     return render_template('admin/user_progress.html', user=user, progress_data=progress_data)
+
+@app.route('/admin/user/<int:user_id>/update-belt', methods=['POST'])
+@login_required
+@admin_required
+def admin_update_belt(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot modify admin user.')
+        return redirect(url_for('admin_users'))
+        
+    new_belt = request.form.get('belt_rank')
+    if new_belt in ['White', 'Yellow', 'Green', 'Blue', 'Red', 'Black']:
+        user.belt_rank = new_belt
+        db.session.commit()
+        flash('Belt rank updated successfully.')
+    else:
+        flash('Invalid belt rank.')
+        
+    return redirect(url_for('admin_user_detail', user_id=user_id))
+
+@app.route('/admin/user/<int:user_id>/send-message', methods=['POST'])
+@login_required
+@admin_required
+def admin_send_message(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot send message to admin user.')
+        return redirect(url_for('admin_users'))
+        
+    content = request.form.get('message')
+    if not content:
+        flash('Message cannot be empty.')
+        return redirect(url_for('admin_dashboard'))
+    
+    # Create new message
+    message = Message(
+        sender_id=current_user.id,
+        receiver_id=user.id,
+        content=content
+    )
+    
+    db.session.add(message)
+    db.session.commit()
+    
+    flash('Message sent successfully.')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/user/<int:user_id>/download-csv')
+@login_required
+@admin_required
+def admin_download_csv(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot download admin data.')
+        return redirect(url_for('admin_users'))
+        
+    # Create CSV data
+    import csv
+    import io
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow(['Date', 'Activity Type', 'Details'])
+    
+    # Write activity data
+    for activity in user.activities:
+        writer.writerow([
+            activity.activity_date.strftime('%Y-%m-%d'),
+            activity.activity_type,
+            activity.details if activity.details else ''
+        ])
+    
+    # Create the response
+    output.seek(0)
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': f'attachment; filename={user.username}_activity.csv'
+        }
+    )
 
 # Add route to create first admin user
 @app.route('/create-admin', methods=['GET', 'POST'])
@@ -879,6 +969,128 @@ def create_admin():
             return render_template('create_admin.html')
             
     return render_template('create_admin.html')
+
+@app.route('/messages')
+@login_required
+def messages():
+    # Get all messages for the current user
+    received_messages = Message.query.filter_by(receiver_id=current_user.id).order_by(Message.created_at.desc()).all()
+    sent_messages = Message.query.filter_by(sender_id=current_user.id).order_by(Message.created_at.desc()).all()
+    
+    # Mark unread messages as read
+    for message in received_messages:
+        if not message.is_read:
+            message.is_read = True
+    db.session.commit()
+    
+    return render_template('messages.html', 
+                         received_messages=received_messages,
+                         sent_messages=sent_messages)
+
+@app.route('/send-message', methods=['POST'])
+@login_required
+def send_message():
+    content = request.form.get('message')
+    if not content:
+        flash('Message cannot be empty.')
+        return redirect(url_for('messages'))
+    
+    # Find the instructor (admin) for this user
+    instructor = User.query.filter_by(is_admin=True).first()
+    if not instructor:
+        flash('No instructor found.')
+        return redirect(url_for('messages'))
+    
+    # Create new message
+    message = Message(
+        sender_id=current_user.id,
+        receiver_id=instructor.id,
+        content=content
+    )
+    
+    db.session.add(message)
+    db.session.commit()
+    
+    flash('Message sent successfully.')
+    return redirect(url_for('messages'))
+
+@app.context_processor
+def inject_unread_messages():
+    if current_user.is_authenticated:
+        unread_count = Message.query.filter_by(
+            receiver_id=current_user.id,
+            is_read=False
+        ).count()
+        return {'unread_messages': unread_count}
+    return {'unread_messages': 0}
+
+@app.route('/admin/messages')
+@app.route('/admin/messages/<int:user_id>')
+@login_required
+@admin_required
+def admin_messages(user_id=None):
+    # Debug: Print current user info
+    print(f"Current user: {current_user.username}, is_admin: {current_user.is_admin}")
+    
+    # Get all non-admin users
+    users = User.query.filter_by(is_admin=False).order_by(User.username).all()
+    print(f"Found {len(users)} non-admin users")
+    for user in users:
+        print(f"User: {user.username}, is_admin: {user.is_admin}")
+    
+    selected_user = None
+    messages = []
+    
+    if user_id:
+        selected_user = User.query.get_or_404(user_id)
+        print(f"Selected user: {selected_user.username}, is_admin: {selected_user.is_admin}")
+        
+        if selected_user.is_admin:
+            flash('Cannot view admin user messages.')
+            return redirect(url_for('admin_messages'))
+            
+        # Get message history between admin and selected user
+        messages = Message.query.filter(
+            ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id)) |
+            ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
+        ).order_by(Message.created_at.desc()).all()
+        print(f"Found {len(messages)} messages for user {user_id}")
+        
+        # Mark unread messages as read
+        for message in messages:
+            if not message.is_read and message.receiver_id == current_user.id:
+                message.is_read = True
+        db.session.commit()
+    
+    return render_template('admin/messages.html', 
+                         users=users,
+                         selected_user=selected_user,
+                         messages=messages)
+
+@app.route('/admin/send-announcement', methods=['POST'])
+@login_required
+@admin_required
+def admin_send_announcement():
+    content = request.form.get('message')
+    if not content:
+        flash('Announcement cannot be empty.')
+        return redirect(url_for('admin_messages'))
+    
+    # Get all non-admin users
+    students = User.query.filter_by(is_admin=False).all()
+    
+    # Create a message for each student
+    for student in students:
+        message = Message(
+            sender_id=current_user.id,
+            receiver_id=student.id,
+            content=content
+        )
+        db.session.add(message)
+    
+    db.session.commit()
+    flash('Announcement sent to all students.')
+    return redirect(url_for('admin_messages'))
 
 if __name__ == '__main__':
     with app.app_context():

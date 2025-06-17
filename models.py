@@ -68,6 +68,7 @@ class UserActivity(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     activity_date = db.Column(db.Date, nullable=False)
     activity_type = db.Column(db.String(50), nullable=False, default='login')
+    details = db.Column(db.Text)  # Add details field for messages and other information
 
     __table_args__ = (
         db.UniqueConstraint('user_id', 'activity_date', 'activity_type', name='unique_user_activity'),
@@ -84,3 +85,18 @@ class LibraryItem(db.Model):
     form_type = db.Column(db.String(50))  # For videos: 'koryo', 'keumgang', etc.
     bpm = db.Column(db.Integer)  # For metronomes
     markers = db.Column(db.JSON)  # For metronomes: store timing markers
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    is_read = db.Column(db.Boolean, default=False)
+
+    # Relationships
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+    def __repr__(self):
+        return f'<Message {self.id}>'

@@ -115,6 +115,14 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="{% if current_user.is_administrator() %}{{ url_for('admin_messages') }}{% else %}{{ url_for('messages') }}{% endif %}">
+                                Messages
+                                {% if unread_messages > 0 %}
+                                    <span class="badge bg-danger">{{ unread_messages }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('practice') }}">
                                 <i class="fas fa-dumbbell me-1"></i>Practice
                             </a>

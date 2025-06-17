@@ -79,12 +79,14 @@
                                     <td>{{ user.username }}</td>
                                     <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
                                     <td>
-                                        <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-user me-1"></i>View Details
-                                        </a>
-                                        <a href="{{ url_for('admin_user_progress', user_id=user.id) }}" class="btn btn-sm btn-info">
-                                            <i class="fas fa-chart-line me-1"></i>View Progress
-                                        </a>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-user"></i> Details
+                                            </a>
+                                            <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#messageModal{{ user.id }}">
+                                                <i class="fas fa-envelope"></i> Message
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -97,6 +99,32 @@
     </div>
 </div>
 
+<!-- Message Modals -->
+{% for user in users %}
+<div class="modal fade" id="messageModal{{ user.id }}" tabindex="-1" aria-labelledby="messageModalLabel{{ user.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageModalLabel{{ user.id }}">Send Message to {{ user.username }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('admin_send_message', user_id=user.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="message{{ user.id }}" class="form-label">Message</label>
+                        <textarea class="form-control" id="message{{ user.id }}" name="message" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 {% block extra_js %}
 <script>
 function copyClassCode() {
@@ -105,6 +133,14 @@ function copyClassCode() {
         alert('Class code copied to clipboard!');
     });
 }
+
+// Initialize all modals
+document.addEventListener('DOMContentLoaded', function() {
+    var modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        new bootstrap.Modal(modal);
+    });
+});
 </script>
 {% endblock %}
 {% endblock %} 
