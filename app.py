@@ -601,7 +601,7 @@ def save_to_library():
             return jsonify({'success': False, 'error': 'Missing required fields'})
         
         # Convert the file path to a URL
-        if file_path.startswith('blob:'):
+        if file_path.startswith('blob:') or file_path.startswith('http'):
             # Handle blob URLs (from recordings)
             file_path = file_path
         else:
