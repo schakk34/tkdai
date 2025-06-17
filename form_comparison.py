@@ -14,7 +14,7 @@ class FormComparison:
     def __init__(self, ideal_data_path=None):
         if ideal_data_path is None:
             # Use default path in static folder
-            ideal_data_path = os.path.join(current_app.static_folder, 'data', 'forms', 'pose_data', 'koryo_ideal_data.json')
+            ideal_data_path = os.path.join(current_app.static_folder, 'data', 'forms', 'pose_data', 'wt_koreo_ideal_data.json')
         
         print(f"Loading ideal pose data from {ideal_data_path}...")
         with open(ideal_data_path, 'r') as f:
@@ -80,18 +80,41 @@ class FormComparison:
             (ideal_landmarks[23]['y'] + ideal_landmarks[24]['y']) / 2
         ])
         
-        # Calculate scale based on height (using nose to ankle distance)
+        # Calculate height scale (primary scaling factor)
         user_height = abs(user_landmarks[0]['y'] - user_landmarks[27]['y'])  # Nose to right ankle
         ideal_height = abs(ideal_landmarks[0]['y'] - ideal_landmarks[27]['y'])
-        scale = user_height / ideal_height if ideal_height > 0 else 1.0
+        height_scale = user_height / ideal_height if ideal_height > 0 else 1.0
+        
+        # Calculate width scale (secondary scaling factor)
+        user_shoulder_width = abs(user_landmarks[11]['x'] - user_landmarks[12]['x'])  # Left to right shoulder
+        ideal_shoulder_width = abs(ideal_landmarks[11]['x'] - ideal_landmarks[12]['x'])
+        width_scale = user_shoulder_width / ideal_shoulder_width if ideal_shoulder_width > 0 else 1.0
+        
+        # Apply different scales for vertical and horizontal dimensions
+        # Increase vertical scale by 20% and reduce horizontal scale
+        vertical_scale = height_scale * 1  # Stretch vertically
+        horizontal_scale = width_scale * 0.9  # Compress horizontally
+        
+        # Add safeguards against extreme scaling
+        vertical_scale = max(0.8, min(vertical_scale, 1.8))  # Increased minimum scale
+        horizontal_scale = max(0.8, min(horizontal_scale, 1.8))  # Increased minimum scale
         
         # Create aligned ideal landmarks
         aligned_ideal = []
         for lm in ideal_landmarks:
-            # Scale and translate the landmark
-            aligned_x = (lm['x'] - ideal_center[0]) * scale + user_center[0]
-            aligned_y = (lm['y'] - ideal_center[1]) * scale + user_center[1]
-            aligned_z = lm['z'] * scale  # Scale depth as well
+            # Skip landmarks with low visibility to prevent hallucination
+            if lm['visibility'] < 0.5:
+                aligned_ideal.append(lm)  # Keep original landmark if visibility is low
+                continue
+                
+            # Scale x and y coordinates differently
+            aligned_x = (lm['x'] - ideal_center[0]) * horizontal_scale + user_center[0]
+            aligned_y = (lm['y'] - ideal_center[1]) * vertical_scale + user_center[1]
+            aligned_z = lm['z'] * ((vertical_scale + horizontal_scale) / 2)  # Average scale for depth
+            
+            # Ensure coordinates stay within reasonable bounds
+            aligned_x = max(0.0, min(aligned_x, 1.0))
+            aligned_y = max(0.0, min(aligned_y, 1.0))
             
             aligned_ideal.append({
                 'x': aligned_x,

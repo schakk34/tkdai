@@ -186,6 +186,19 @@ let countdownTimeout;
 let audioElement;
 let idealFrameCount = 0;
 
+async function loadIdealData(formType) {
+    try {
+        const response = await fetch(`/static/data/forms/pose_data/${formType}_ideal_data.json`);
+        const data = await response.json();
+        idealFrameCount = data.pose_data.length;
+        console.log(`${formType} ideal video has ${idealFrameCount} frames`);
+        return true;
+    } catch (error) {
+        console.error(`Error loading ${formType} ideal data:`, error);
+        return false;
+    }
+}
+
 async function setupCamera() {
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
@@ -215,15 +228,8 @@ async function setupCamera() {
         // Preload the audio
         audioElement.load();
         
-        // Get ideal frame count
-        try {
-            const response = await fetch('/static/data/forms/pose_data/koryo_ideal_data.json');
-            const data = await response.json();
-            idealFrameCount = data.pose_data.length;
-            console.log(`Ideal video has ${idealFrameCount} frames`);
-        } catch (error) {
-            console.error('Error loading ideal data:', error);
-        }
+        // Load initial ideal data (default to koryo)
+        await loadIdealData('koryo');
         
     } catch (err) {
         console.error('Error accessing camera:', err);
@@ -542,6 +548,17 @@ document.getElementById('saveRecordingToLibrary').addEventListener('click', asyn
     } catch (error) {
         console.error('Error:', error);
         alert('An error occurred while saving to library');
+    }
+});
+
+// Add event listener for form type selection
+document.getElementById('formType').addEventListener('change', async function(e) {
+    const formType = e.target.value;
+    if (formType) {
+        const success = await loadIdealData(formType);
+        if (!success) {
+            alert(`Error loading ideal data for ${formType}. Please try another form or contact support.`);
+        }
     }
 });
 
