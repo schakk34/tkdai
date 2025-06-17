@@ -274,13 +274,13 @@ class FormComparison:
                         ideal_pts_arr = np.array([[lm['x'], lm['y']] for lm in aligned_ideal])
 
                         # 2) Compute joint & angle errors
-                        j_errs = joint_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_JOINTS)
-                        a_errs = angle_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_ANGLES)
+                        joint_errs = joint_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_JOINTS)
+                        angle_errs = angle_errors(user_pts_arr, ideal_pts_arr, included=SELECTED_ANGLES)
 
                         # 3) Build your timestamp (in seconds) and package into a feature vector
                         t_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
                         t_sec = t_msec / 1000.0
-                        fv = build_feature_vector(t_sec, j_errs, a_errs)
+                        fv = build_feature_vector(t_sec, joint_errs, angle_errs)
 
                         # 4) Append to the list
                         all_feature_vectors.append(fv)
