@@ -207,7 +207,8 @@ function playVideo(videoPath, title) {
     // Add timestamp to prevent caching
     const videoUrl = videoPath + '?t=' + new Date().getTime();
     console.log('Attempting to play video:', videoUrl);  // Debug log
-    
+
+
     // Set up error handling
     video.onerror = function(e) {
         console.error('Error loading video:', videoPath, e);  // Debug log
@@ -277,7 +278,7 @@ function playRhythm(button) {
 {#        console.error(err);#}
 {#        alert('Error deleting item.');#}
 {#    });#}
-{#}#}
+{# } #}
 
 function deleteItem(itemId) {
     if (confirm('Are you sure you want to delete this item?')) {
