@@ -57,7 +57,6 @@ class FormComparison:
              for lm in f['landmarks']]
             for f in self.pose_data
         ])
-        print("hi")
     
     def is_valid_point(self, x, y, frame_shape):
         """Check if a point is within the frame bounds."""
