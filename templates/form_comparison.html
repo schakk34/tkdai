@@ -339,6 +339,8 @@ document.getElementById('stopRecording').addEventListener('click', () => {
     document.getElementById('recordingStatus').style.display = 'none';
 });
 
+let savedVectors = []
+
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -372,6 +374,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         if (data.success) {
             const resultVideo = document.getElementById('resultVideo');
             resultVideo.src = data.video_url;
+            savedVectors = data.all_feature_vectors;
             document.getElementById('results').style.display = 'block';
             document.getElementById('downloadResult').href = data.video_url;
             document.getElementById('downloadResult').download = 'form-comparison.mp4';
@@ -438,9 +441,7 @@ document.getElementById('analyzeForm').addEventListener('click', async () => {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                video_url: document.getElementById('resultVideo').src
-            })
+            body: JSON.stringify({ feature_vectors: savedVectors})
         });
         
         const data = await response.json();

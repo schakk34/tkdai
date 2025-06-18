@@ -556,7 +556,8 @@ def process_form_comparison():
             'video_url': url_for('static', filename=f'uploads/{current_user.id}/{os.path.basename(result_video_path)}'),
             'score': score_percentage,
             'stars_earned': stars_earned,
-            'total_stars': current_user.star_count
+            'total_stars': current_user.star_count,
+            'all_feature_vectors': feature_vectors
         })
 
     except Exception as e:
@@ -595,46 +596,13 @@ form_analyzer = FormAnalyzer()
 @login_required
 def analyze_form():
     data = request.get_json()
-    video_url = data.get('video_url')
+    fvs = data.get('feature_vectors')
+    if not fvs:
+        return jsonify({'success': False, 'error': 'No feature vectors received'}), 400
 
-    if not video_url:
-        return jsonify({"success": False, "error": "No video URL provided"})
-
-    try:
-        video_path = os.path.join('static', os.path.basename(video_url))
-        feedback = analyze_form_feedback(video_path)
-        return jsonify({"success": True, "feedback": feedback})
-    except Exception as e:
-        print("Feedback error:", e)
-        return jsonify({"success": False, "error": "Failed to analyze video"})
-
-import random
-def analyze_form_feedback(video_path):
-    # Simulate feedback for a 10-second video
-    feedback_comments = [
-        "Left arm too low during knifehand block.",
-        "Back stance is too narrow.",
-        "Kihap is missing at the turn.",
-        "Hands not chambered properly before side kick.",
-        "Guard dropped too early during turn.",
-        "Front stance is too short.",
-        "Posture leans too far forward during punch.",
-        "Timing mismatch with the rhythm.",
-        "Inconsistent height on successive kicks.",
-        "Turn should be more controlled."
-    ]
-
-    # Pretend we're generating feedback every 2 seconds
-    feedback = []
-    for i in range(0, 10, 2):
-        timestamp = f"00:{i:02}"
-        comment = random.choice(feedback_comments)
-        feedback.append({
-            "timestamp": timestamp,
-            "text": comment
-        })
-
-    return feedback
+    analyzer = FormAnalyzer(provider='gemini')
+    feedback = analyzer.analyze(fvs)
+    return jsonify({'success': True, 'feedback': feedback})
 
 @app.route('/library')
 @login_required
