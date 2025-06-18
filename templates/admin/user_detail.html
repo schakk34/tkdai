@@ -67,8 +67,46 @@
             </div>
         </div>
 
-        <!-- Activity and Messages -->
+        <!-- Activity, Messages, and Videos -->
         <div class="col-md-8">
+            <!-- Student Videos -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="mb-0">Student Videos ({{ user.videos|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if user.videos %}
+                        <div class="list-group">
+                            {% for video in user.videos|sort(attribute='created_at', reverse=true) %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ video.title }}</h6>
+                                        <small class="text-muted">
+                                            {{ video.form_type or 'Unknown Form' }} • 
+                                            {{ video.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                            {% if video.comments %}
+                                                • <span class="badge bg-danger">{{ video.comments|length }} comments</span>
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <a href="{{ url_for('admin_view_student_video', user_id=user.id, video_id=video.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye me-1"></i>View & Comment
+                                    </a>
+                                </div>
+                                {% if video.description %}
+                                    <p class="mb-1 mt-2">{{ video.description }}</p>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No videos uploaded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Recent Activity -->
             <div class="card mb-4">
                 <div class="card-header" style="background-color: var(--primary-color); color: white;">
@@ -77,16 +115,18 @@
                 <div class="card-body">
                     {% if user.activities %}
                         <div class="list-group">
-                            {% for activity in user.activities|sort(attribute='activity_date', reverse=true)[:5] %}
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ activity.activity_type }}</h6>
-                                    <small>{{ activity.activity_date.strftime('%Y-%m-%d') }}</small>
+                            {% for activity in user.activities|sort(attribute='activity_date', reverse=true) %}
+                                {% if loop.index <= 5 %}
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">{{ activity.activity_type }}</h6>
+                                        <small>{{ activity.activity_date.strftime('%Y-%m-%d') }}</small>
+                                    </div>
+                                    {% if activity.details %}
+                                        <p class="mb-1">{{ activity.details }}</p>
+                                    {% endif %}
                                 </div>
-                                {% if activity.details %}
-                                    <p class="mb-1">{{ activity.details }}</p>
                                 {% endif %}
-                            </div>
                             {% endfor %}
                         </div>
                     {% else %}

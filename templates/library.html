@@ -96,6 +96,9 @@
                                 <button class="btn btn-sm btn-outline-primary" onclick="playVideo('{{ item.file_path }}', '{{ item.title }}')">
                                     <i class="fas fa-play"></i>
                                 </button>
+                                <a href="{{ url_for('view_my_video', video_id=item.id) }}" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-comments"></i>
+                                </a>
                                 <button class="btn btn-sm btn-outline-success" onclick="exportItem('{{ item.file_path }}', '{{ item.title }}')">
                                     <i class="fas fa-download"></i>
                                 </button>

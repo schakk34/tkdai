@@ -19,7 +19,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
-from models import db, LibraryItem, User, Progress, UserActivity, Message
+from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -1119,6 +1119,120 @@ def admin_send_announcement():
     db.session.commit()
     flash('Announcement sent to all students.')
     return redirect(url_for('admin_messages'))
+
+@app.route('/admin/user/<int:user_id>/video/<int:video_id>')
+@login_required
+@admin_required
+def admin_view_student_video(user_id, video_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot view admin user videos.')
+        return redirect(url_for('admin_users'))
+    
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.user_id != user_id:
+        flash('Video does not belong to this user.')
+        return redirect(url_for('admin_users'))
+    
+    if video.item_type != 'video':
+        flash('This item is not a video.')
+        return redirect(url_for('admin_users'))
+    
+    # Get existing comments for this video
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    
+    return render_template('admin/view_student_video.html', 
+                         user=user, 
+                         video=video, 
+                         comments=comments)
+
+@app.route('/api/video/<int:video_id>/comments', methods=['GET'])
+@login_required
+@admin_required
+def get_video_comments(video_id):
+    """Get all comments for a video"""
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    return jsonify([{
+        'id': comment.id,
+        'timestamp': comment.timestamp,
+        'comment': comment.comment,
+        'created_at': comment.created_at.isoformat(),
+        'admin_name': comment.admin.username
+    } for comment in comments])
+
+@app.route('/api/video/<int:video_id>/comments', methods=['POST'])
+@login_required
+@admin_required
+def add_video_comment(video_id):
+    """Add a new comment to a video"""
+    data = request.get_json()
+    timestamp = data.get('timestamp')
+    comment_text = data.get('comment')
+    
+    if not timestamp or not comment_text:
+        return jsonify({'error': 'Timestamp and comment are required'}), 400
+    
+    # Verify the video exists and belongs to a student
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.item_type != 'video':
+        return jsonify({'error': 'Item is not a video'}), 400
+    
+    student = User.query.get(video.user_id)
+    if student.is_admin:
+        return jsonify({'error': 'Cannot comment on admin videos'}), 400
+    
+    # Create the comment
+    new_comment = VideoComment(
+        video_id=video_id,
+        admin_id=current_user.id,
+        timestamp=timestamp,
+        comment=comment_text
+    )
+    
+    db.session.add(new_comment)
+    db.session.commit()
+    
+    return jsonify({
+        'id': new_comment.id,
+        'timestamp': new_comment.timestamp,
+        'comment': new_comment.comment,
+        'created_at': new_comment.created_at.isoformat(),
+        'admin_name': current_user.username
+    })
+
+@app.route('/api/comment/<int:comment_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_video_comment(comment_id):
+    """Delete a video comment (only by the admin who created it)"""
+    comment = VideoComment.query.get_or_404(comment_id)
+    
+    if comment.admin_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    db.session.delete(comment)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/library/video/<int:video_id>')
+@login_required
+def view_my_video(video_id):
+    video = LibraryItem.query.get_or_404(video_id)
+    
+    # Ensure the video belongs to the current user
+    if video.user_id != current_user.id:
+        flash('You can only view your own videos.')
+        return redirect(url_for('library'))
+    
+    if video.item_type != 'video':
+        flash('This item is not a video.')
+        return redirect(url_for('library'))
+    
+    # Get comments for this video
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    
+    return render_template('view_my_video.html', video=video, comments=comments)
 
 if __name__ == '__main__':
     with app.app_context():
