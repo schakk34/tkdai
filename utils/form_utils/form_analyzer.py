@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import re
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -117,12 +118,21 @@ Focus on the largest errors first and give clear coaching tips.
             )
             text = response.text.strip()
 
-        # Parse JSON feedback
+        m = re.search(r'```json\s*(\{[\s\S]*?\})\s*```', text)
+        if m:
+            json_str = m.group(1)
+        else:
+            # Fallback: first {...} to last }
+            start = text.find('{');
+            end = text.rfind('}')
+            json_str = text[start:end + 1] if start != -1 and end != -1 else text
+
+        # Parse and return
         try:
-            result = json.loads(text)
+            result = json.loads(json_str)
             return result.get('feedback', [])
-        except json.JSONDecodeError:
-            raise ValueError(f"Failed to parse LLM response as JSON: {text}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON parse error: {e}\nExtracted text:\n{json_str}")
 
     def analyze(self, feature_vectors):
         """
