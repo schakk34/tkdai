@@ -27,7 +27,7 @@ app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # 256MB max file size
 
 # Initialize database
 db.init_app(app)
@@ -501,8 +501,6 @@ def process_form_comparison():
         # Map form types to their actual file names
         form_type_map = {
             'koryo': 'koryo',
-            'keumgang': 'keumgang', 
-            'taebaek': 'taebaek',
             'chiljang': 'wt_chiljang'
         }
         
@@ -569,8 +567,10 @@ def process_form_comparison():
         })
 
     except Exception as e:
+        import traceback
         print(f"Error processing form comparison: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Error processing video: {str(e)}'}), 500
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'mp3', 'wav'}
