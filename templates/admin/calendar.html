@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Calendar Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Calendar Management</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Add Event Form -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="mb-0">Add New Event</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin_add_event') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Event Title *</label>
+                            <input type="text" class="form-control" id="title" name="title" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="event_date" class="form-label">Date *</label>
+                            <input type="date" class="form-control" id="event_date" name="event_date" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_all_day" name="is_all_day" checked>
+                                <label class="form-check-label" for="is_all_day">
+                                    All Day Event
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3" id="time_field" style="display: none;">
+                            <label for="event_time" class="form-label">Time</label>
+                            <input type="time" class="form-control" id="event_time" name="event_time">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="event_type" class="form-label">Event Type</label>
+                            <select class="form-select" id="event_type" name="event_type">
+                                <option value="general">General</option>
+                                <option value="class">Class</option>
+                                <option value="competition">Competition</option>
+                                <option value="seminar">Seminar</option>
+                                <option value="test">Belt Test</option>
+                                <option value="tournament">Tournament</option>
+                                <option value="practice">Practice</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Student Selection -->
+                        <div class="mb-3">
+                            <label class="form-label">Send to Students</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="send_to_all" name="send_to_all" checked>
+                                <label class="form-check-label" for="send_to_all">
+                                    Send to All Students
+                                </label>
+                            </div>
+                            <div class="mt-2" id="student_selection" style="display: none;">
+                                <label class="form-label">Or select specific students:</label>
+                                <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                    {% for student in students %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="student_{{ student.id }}" 
+                                               name="target_students" value="{{ student.id }}">
+                                        <label class="form-check-label" for="student_{{ student.id }}">
+                                            {{ student.username }} ({{ student.belt_rank }})
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-plus me-2"></i>Add Event
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events List -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="mb-0">Manage Events</h5>
+                </div>
+                <div class="card-body">
+                    {% if events %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Target</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ event.title }}</strong>
+                                            {% if event.description %}
+                                                <br><small class="text-muted">{{ event.description[:50] }}{% if event.description|length > 50 %}...{% endif %}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ event.event_date.strftime('%Y-%m-%d') }}
+                                            {% if not event.is_all_day and event.event_time %}
+                                                <br><small class="text-muted">{{ event.event_time.strftime('%H:%M') }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ event.event_type|title }}</span>
+                                        </td>
+                                        <td>
+                                            {% if event.location %}
+                                                {{ event.location }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if event.send_to_all %}
+                                                <span class="badge bg-success">All Students</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Selected Students</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                        data-bs-toggle="modal" data-bs-target="#editModal{{ event.id }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ event.id }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">No events created yet. Add your first event using the form on the left.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Event Modals -->
+{% for event in events %}
+<div class="modal fade" id="editModal{{ event.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('admin_edit_event', event_id=event.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_title_{{ event.id }}" class="form-label">Event Title *</label>
+                                <input type="text" class="form-control" id="edit_title_{{ event.id }}" name="title" value="{{ event.title }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit_description_{{ event.id }}" class="form-label">Description</label>
+                                <textarea class="form-control" id="edit_description_{{ event.id }}" name="description" rows="3">{{ event.description or '' }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit_event_date_{{ event.id }}" class="form-label">Date *</label>
+                                <input type="date" class="form-control" id="edit_event_date_{{ event.id }}" name="event_date" value="{{ event.event_date.strftime('%Y-%m-%d') }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="edit_is_all_day_{{ event.id }}" name="is_all_day" {% if event.is_all_day %}checked{% endif %}>
+                                    <label class="form-check-label" for="edit_is_all_day_{{ event.id }}">
+                                        All Day Event
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3" id="edit_time_field_{{ event.id }}" style="display: {% if not event.is_all_day %}block{% else %}none{% endif %};">
+                                <label for="edit_event_time_{{ event.id }}" class="form-label">Time</label>
+                                <input type="time" class="form-control" id="edit_event_time_{{ event.id }}" name="event_time" 
+                                       value="{% if event.event_time %}{{ event.event_time.strftime('%H:%M') }}{% endif %}">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_location_{{ event.id }}" class="form-label">Location</label>
+                                <input type="text" class="form-control" id="edit_location_{{ event.id }}" name="location" value="{{ event.location or '' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit_event_type_{{ event.id }}" class="form-label">Event Type</label>
+                                <select class="form-select" id="edit_event_type_{{ event.id }}" name="event_type">
+                                    <option value="general" {% if event.event_type == 'general' %}selected{% endif %}>General</option>
+                                    <option value="class" {% if event.event_type == 'class' %}selected{% endif %}>Class</option>
+                                    <option value="competition" {% if event.event_type == 'competition' %}selected{% endif %}>Competition</option>
+                                    <option value="seminar" {% if event.event_type == 'seminar' %}selected{% endif %}>Seminar</option>
+                                    <option value="test" {% if event.event_type == 'test' %}selected{% endif %}>Belt Test</option>
+                                    <option value="tournament" {% if event.event_type == 'tournament' %}selected{% endif %}>Tournament</option>
+                                    <option value="practice" {% if event.event_type == 'practice' %}selected{% endif %}>Practice</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Student Selection for Edit -->
+                            <div class="mb-3">
+                                <label class="form-label">Send to Students</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="edit_send_to_all_{{ event.id }}" name="send_to_all" {% if event.send_to_all %}checked{% endif %}>
+                                    <label class="form-check-label" for="edit_send_to_all_{{ event.id }}">
+                                        Send to All Students
+                                    </label>
+                                </div>
+                                <div class="mt-2" id="edit_student_selection_{{ event.id }}" style="display: {% if not event.send_to_all %}block{% else %}none{% endif %};">
+                                    <label class="form-label">Or select specific students:</label>
+                                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                        {% for student in students %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="edit_student_{{ event.id }}_{{ student.id }}" 
+                                                   name="target_students" value="{{ student.id }}"
+                                                   {% if not event.send_to_all and event.target_students and student.id in event.target_students %}checked{% endif %}>
+                                            <label class="form-check-label" for="edit_student_{{ event.id }}_{{ student.id }}">
+                                                {{ student.username }} ({{ student.belt_rank }})
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Event Modal -->
+<div class="modal fade" id="deleteModal{{ event.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the event "<strong>{{ event.title }}</strong>"?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('admin_delete_event', event_id=event.id) }}" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Delete Event</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle all-day checkbox for add form
+    const allDayCheckbox = document.getElementById('is_all_day');
+    const timeField = document.getElementById('time_field');
+    
+    if (allDayCheckbox) {
+        allDayCheckbox.addEventListener('change', function() {
+            timeField.style.display = this.checked ? 'none' : 'block';
+        });
+    }
+    
+    // Handle send to all checkbox for add form
+    const sendToAllCheckbox = document.getElementById('send_to_all');
+    const studentSelection = document.getElementById('student_selection');
+    
+    if (sendToAllCheckbox) {
+        sendToAllCheckbox.addEventListener('change', function() {
+            studentSelection.style.display = this.checked ? 'none' : 'block';
+        });
+    }
+    
+    // Handle all-day checkbox for edit forms
+    {% for event in events %}
+    const editAllDayCheckbox{{ event.id }} = document.getElementById('edit_is_all_day_{{ event.id }}');
+    const editTimeField{{ event.id }} = document.getElementById('edit_time_field_{{ event.id }}');
+    
+    if (editAllDayCheckbox{{ event.id }}) {
+        editAllDayCheckbox{{ event.id }}.addEventListener('change', function() {
+            editTimeField{{ event.id }}.style.display = this.checked ? 'none' : 'block';
+        });
+    }
+    
+    // Handle send to all checkbox for edit forms
+    const editSendToAllCheckbox{{ event.id }} = document.getElementById('edit_send_to_all_{{ event.id }}');
+    const editStudentSelection{{ event.id }} = document.getElementById('edit_student_selection_{{ event.id }}');
+    
+    if (editSendToAllCheckbox{{ event.id }}) {
+        editSendToAllCheckbox{{ event.id }}.addEventListener('change', function() {
+            editStudentSelection{{ event.id }}.style.display = this.checked ? 'none' : 'block';
+        });
+    }
+    {% endfor %}
+});
+</script>
+{% endblock %} 

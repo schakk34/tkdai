@@ -7,19 +7,19 @@ from datetime import datetime
 from functools import wraps
 
 import cv2
-import requests
-from bs4 import BeautifulSoup
 from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
 
 from PracticeStudio import PracticeStudio
 from capture import Capture
 from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
-from models import db, LibraryItem, User, Progress, UserActivity, Message
+from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -27,7 +27,7 @@ app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # 256MB max file size
 
 # Initialize database
 db.init_app(app)
@@ -228,6 +228,7 @@ def signup():
 @login_required
 def logout():
     logout_user()
+    flash('You have been logged out.')
     return redirect(url_for('landing'))
 
 def get_wt_calendar_events():
@@ -353,12 +354,17 @@ def get_wt_calendar_events():
 def dashboard():
     print(f"Accessing dashboard for user: {current_user.username}")  # Debug log
 
-    # Get WT calendar events
+    # Get both WT calendar events and custom events relevant to this user
     wt_events = get_wt_calendar_events()
+    custom_events = CustomEvent.query.filter(
+        (CustomEvent.send_to_all == True) | 
+        (CustomEvent.target_students.contains([current_user.id]))
+    ).order_by(CustomEvent.event_date).all()
 
     return render_template('dashboard.html',
                          user=current_user,
-                         wt_events=wt_events)
+                         wt_events=wt_events,
+                         custom_events=custom_events)
 
 @app.route('/practice')
 @login_required
@@ -498,12 +504,19 @@ def process_form_comparison():
             rhythm_file.save(rhythm_path)
 
         # Check if ideal data exists for this form
-        ideal_data_path = os.path.join(app.static_folder, 'data', 'forms', 'pose_data', f'{form_type}_ideal_data.json')
+        # Map form types to their actual file names
+        form_type_map = {
+            'koryo': 'koryo',
+            'chiljang': 'wt_chiljang'
+        }
+        
+        file_name = form_type_map.get(form_type, form_type)
+        ideal_data_path = os.path.join(app.static_folder, 'data', 'forms', 'pose_data', f'{file_name}_ideal_data.json')
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type}'}), 400
 
         # Process the video
-        form_comparison = FormComparison()
+        form_comparison = FormComparison(ideal_data_path=ideal_data_path)
         result_video_path, feature_vectors = form_comparison.process_user_video(
             user_video_path=mp4_path,
             output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),
@@ -561,8 +574,10 @@ def process_form_comparison():
         })
 
     except Exception as e:
+        import traceback
         print(f"Error processing form comparison: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        print(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Error processing video: {str(e)}'}), 500
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'mp4', 'mov', 'avi', 'mp3', 'wav'}
@@ -692,24 +707,35 @@ def delete_library_item(item_id):
 @login_required
 def get_user_activity():
     try:
-        # Get all login activities for the current user
-        activities = UserActivity.query.filter_by(
-            user_id=current_user.id,
-            activity_type='login'
-        ).all()
-
-        # Format activities for FullCalendar
+        # Get custom events that are relevant to the current user
+        # Events sent to all students OR events specifically targeting this user
+        custom_events = CustomEvent.query.filter(
+            (CustomEvent.send_to_all == True) | 
+            (CustomEvent.target_students.contains([current_user.id]))
+        ).order_by(CustomEvent.event_date).all()
+        
         events = []
-        for activity in activities:
-            events.append({
-                'title': 'Logged in',
-                'start': activity.activity_date.isoformat(),
-                'allDay': True
-            })
+        for event in custom_events:
+            event_data = {
+                'id': f'custom_{event.id}',
+                'title': event.title,
+                'start': event.event_date.isoformat(),
+                'allDay': event.is_all_day,
+                'description': event.description,
+                'location': event.location,
+                'event_type': event.event_type,
+                'color': '#28a745'  # Green for custom events
+            }
+            
+            # Add time if not all-day event
+            if not event.is_all_day and event.event_time:
+                event_data['start'] = f"{event.event_date.isoformat()}T{event.event_time.isoformat()}"
+            
+            events.append(event_data)
 
         return jsonify(events)
     except Exception as e:
-        print(f"Error fetching user activity: {str(e)}")
+        print(f"Error fetching custom events: {str(e)}")
         return jsonify([])
 
 @app.route('/static/uploads/<path:filename>')
@@ -1078,6 +1104,256 @@ def admin_send_announcement():
     db.session.commit()
     flash('Announcement sent to all students.')
     return redirect(url_for('admin_messages'))
+
+@app.route('/admin/user/<int:user_id>/video/<int:video_id>')
+@login_required
+@admin_required
+def admin_view_student_video(user_id, video_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_admin:
+        flash('Cannot view admin user videos.')
+        return redirect(url_for('admin_users'))
+    
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.user_id != user_id:
+        flash('Video does not belong to this user.')
+        return redirect(url_for('admin_users'))
+    
+    if video.item_type != 'video':
+        flash('This item is not a video.')
+        return redirect(url_for('admin_users'))
+    
+    # Get existing comments for this video
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    
+    return render_template('admin/view_student_video.html', 
+                         user=user, 
+                         video=video, 
+                         comments=comments)
+
+@app.route('/api/video/<int:video_id>/comments', methods=['GET'])
+@login_required
+@admin_required
+def get_video_comments(video_id):
+    """Get all comments for a video"""
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    return jsonify([{
+        'id': comment.id,
+        'timestamp': comment.timestamp,
+        'comment': comment.comment,
+        'created_at': comment.created_at.isoformat(),
+        'admin_name': comment.admin.username
+    } for comment in comments])
+
+@app.route('/api/video/<int:video_id>/comments', methods=['POST'])
+@login_required
+@admin_required
+def add_video_comment(video_id):
+    """Add a new comment to a video"""
+    data = request.get_json()
+    timestamp = data.get('timestamp')
+    comment_text = data.get('comment')
+    
+    if not timestamp or not comment_text:
+        return jsonify({'error': 'Timestamp and comment are required'}), 400
+    
+    # Verify the video exists and belongs to a student
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.item_type != 'video':
+        return jsonify({'error': 'Item is not a video'}), 400
+    
+    student = User.query.get(video.user_id)
+    if student.is_admin:
+        return jsonify({'error': 'Cannot comment on admin videos'}), 400
+    
+    # Create the comment
+    new_comment = VideoComment(
+        video_id=video_id,
+        admin_id=current_user.id,
+        timestamp=timestamp,
+        comment=comment_text
+    )
+    
+    db.session.add(new_comment)
+    db.session.commit()
+    
+    return jsonify({
+        'id': new_comment.id,
+        'timestamp': new_comment.timestamp,
+        'comment': new_comment.comment,
+        'created_at': new_comment.created_at.isoformat(),
+        'admin_name': current_user.username
+    })
+
+@app.route('/api/comment/<int:comment_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_video_comment(comment_id):
+    """Delete a video comment (only by the admin who created it)"""
+    comment = VideoComment.query.get_or_404(comment_id)
+    
+    if comment.admin_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    db.session.delete(comment)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/library/video/<int:video_id>')
+@login_required
+def view_my_video(video_id):
+    video = LibraryItem.query.get_or_404(video_id)
+    
+    # Check if the video belongs to the current user
+    if video.user_id != current_user.id:
+        flash('You can only view your own videos.')
+        return redirect(url_for('library'))
+    
+    return render_template('view_my_video.html', video=video)
+
+# Calendar Management Routes
+@app.route('/admin/calendar')
+@login_required
+@admin_required
+def admin_calendar():
+    """Admin calendar management page"""
+    events = CustomEvent.query.order_by(CustomEvent.event_date).all()
+    students = User.query.filter_by(is_admin=False).order_by(User.username).all()
+    return render_template('admin/calendar.html', events=events, students=students)
+
+@app.route('/admin/calendar/add', methods=['POST'])
+@login_required
+@admin_required
+def admin_add_event():
+    """Add a new calendar event"""
+    try:
+        title = request.form.get('title')
+        description = request.form.get('description')
+        event_date = datetime.strptime(request.form.get('event_date'), '%Y-%m-%d').date()
+        event_time_str = request.form.get('event_time')
+        location = request.form.get('location')
+        event_type = request.form.get('event_type', 'general')
+        is_all_day = request.form.get('is_all_day') == 'on'
+        send_to_all = request.form.get('send_to_all') == 'on'
+        target_students = request.form.getlist('target_students')
+        
+        # Parse time if provided
+        event_time = None
+        if event_time_str and not is_all_day:
+            event_time = datetime.strptime(event_time_str, '%H:%M').time()
+        
+        # Convert target_students to list of integers
+        target_student_ids = [int(sid) for sid in target_students] if target_students else []
+        
+        event = CustomEvent(
+            title=title,
+            description=description,
+            event_date=event_date,
+            event_time=event_time,
+            location=location,
+            event_type=event_type,
+            created_by=current_user.id,
+            is_all_day=is_all_day,
+            send_to_all=send_to_all,
+            target_students=target_student_ids if not send_to_all else None
+        )
+        
+        db.session.add(event)
+        db.session.commit()
+        
+        flash('Event added successfully!', 'success')
+    except Exception as e:
+        flash(f'Error adding event: {str(e)}', 'error')
+        db.session.rollback()
+    
+    return redirect(url_for('admin_calendar'))
+
+@app.route('/admin/calendar/edit/<int:event_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_edit_event(event_id):
+    """Edit an existing calendar event"""
+    event = CustomEvent.query.get_or_404(event_id)
+    
+    try:
+        event.title = request.form.get('title')
+        event.description = request.form.get('description')
+        event.event_date = datetime.strptime(request.form.get('event_date'), '%Y-%m-%d').date()
+        event_time_str = request.form.get('event_time')
+        event.location = request.form.get('location')
+        event.event_type = request.form.get('event_type', 'general')
+        event.is_all_day = request.form.get('is_all_day') == 'on'
+        event.send_to_all = request.form.get('send_to_all') == 'on'
+        target_students = request.form.getlist('target_students')
+        
+        # Parse time if provided
+        event.event_time = None
+        if event_time_str and not event.is_all_day:
+            event.event_time = datetime.strptime(event_time_str, '%H:%M').time()
+        
+        # Update target students
+        if event.send_to_all:
+            event.target_students = None
+        else:
+            target_student_ids = [int(sid) for sid in target_students] if target_students else []
+            event.target_students = target_student_ids
+        
+        db.session.commit()
+        flash('Event updated successfully!', 'success')
+    except Exception as e:
+        flash(f'Error updating event: {str(e)}', 'error')
+        db.session.rollback()
+    
+    return redirect(url_for('admin_calendar'))
+
+@app.route('/admin/calendar/delete/<int:event_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_event(event_id):
+    """Delete a calendar event"""
+    event = CustomEvent.query.get_or_404(event_id)
+    
+    try:
+        db.session.delete(event)
+        db.session.commit()
+        flash('Event deleted successfully!', 'success')
+    except Exception as e:
+        flash(f'Error deleting event: {str(e)}', 'error')
+        db.session.rollback()
+    
+    return redirect(url_for('admin_calendar'))
+
+@app.route('/get_custom_events')
+@login_required
+def get_custom_events():
+    """Get custom events for calendar display"""
+    try:
+        events = CustomEvent.query.order_by(CustomEvent.event_date).all()
+        
+        calendar_events = []
+        for event in events:
+            event_data = {
+                'id': event.id,
+                'title': event.title,
+                'start': event.event_date.isoformat(),
+                'allDay': event.is_all_day,
+                'description': event.description,
+                'location': event.location,
+                'event_type': event.event_type,
+                'created_by': event.creator.username
+            }
+            
+            # Add time if not all-day event
+            if not event.is_all_day and event.event_time:
+                event_data['start'] = f"{event.event_date.isoformat()}T{event.event_time.isoformat()}"
+            
+            calendar_events.append(event_data)
+        
+        return jsonify(calendar_events)
+    except Exception as e:
+        print(f"Error fetching custom events: {str(e)}")
+        return jsonify([])
 
 if __name__ == '__main__':
     with app.app_context():

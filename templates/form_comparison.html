@@ -10,10 +10,14 @@
         background: #000;
         border-radius: 4px;
         overflow: hidden;
+        max-height: 800px;
+        min-height: 300px;
     }
     .video-container video {
         width: 100%;
         height: auto;
+        max-height: 800px;
+        object-fit: contain;
     }
     .feedback-content {
         max-height: 400px;
@@ -32,6 +36,26 @@
     .feedback-text {
         margin-top: 5px;
     }
+    .recording-section {
+        border-right: 1px solid #dee2e6;
+    }
+    .reference-section {
+        border-left: 1px solid #dee2e6;
+    }
+    @media (max-width: 768px) {
+        .recording-section,
+        .reference-section {
+            border: none;
+            margin-bottom: 20px;
+        }
+        .video-container {
+            max-height: 350px;
+            min-height: 250px;
+        }
+        .video-container video {
+            max-height: 350px;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -40,9 +64,10 @@
     <h1 class="mb-4">Form Comparison</h1>
     
     <div class="row">
-        <!-- Recording Section -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
+        <!-- Left Column: Recording and Upload -->
+        <div class="col-md-6">
+            <!-- Recording Section -->
+            <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Record Your Form</h5>
                 </div>
@@ -77,10 +102,8 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Upload Section -->
-        <div class="col-md-6">
+            <!-- Upload Section -->
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">Upload Video for Comparison</h5>
@@ -92,8 +115,7 @@
                             <select class="form-select" id="formType" name="formType" required>
                                 <option value="">Choose a form...</option>
                                 <option value="koryo">Koryo</option>
-                                <option value="keumgang">Keumgang</option>
-                                <option value="taebaek">Taebaek</option>
+                                <option value="chiljang">Taeguk Chil Jang</option>
                             </select>
                         </div>
                         
@@ -111,6 +133,45 @@
                             <i class="fas fa-upload me-2"></i>Start Comparison
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Reference Video -->
+        <div class="col-md-6">
+            <!-- Reference Video Section -->
+            <div class="card mb-4" id="referenceVideoSection" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0">Reference Video - <span id="currentFormDisplay">Select a form first</span></h5>
+                </div>
+                <div class="card-body">
+                    <div class="video-container mb-3">
+                        <video id="referenceVideo" class="w-100" controls muted>
+                            <source id="referenceVideoSource" src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <div class="text-center">
+                        <small class="text-muted">Watch this video for reference while recording your form</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Form Selection Prompt -->
+            <div class="card" id="formSelectionPrompt">
+                <div class="card-header">
+                    <h5 class="mb-0">Choose Your Form</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <label for="formTypePrompt" class="form-label">Select a form to practice:</label>
+                        <select class="form-select" id="formTypePrompt">
+                            <option value="">Choose a form...</option>
+                            <option value="koryo">Koryo</option>
+                            <option value="chiljang">Taeguk Chil Jang</option>
+                        </select>
+                    </div>
+                    <p class="text-muted">Select a form above to see the reference video and start practicing!</p>
                 </div>
             </div>
         </div>
@@ -183,12 +244,22 @@ let mediaRecorder;
 let recordedChunks = [];
 let stream;
 let countdownTimeout;
-let audioElement;
 let idealFrameCount = 0;
+let referenceVideo = null;
+let currentFormType = 'koryo'; // Default form type
 
 async function loadIdealData(formType) {
     try {
-        const response = await fetch(`/static/data/forms/pose_data/${formType}_ideal_data.json`);
+        // Map form types to their actual file names
+        const formTypeMap = {
+            'koryo': 'koryo',
+            'keumgang': 'keumgang', 
+            'taebaek': 'taebaek',
+            'chiljang': 'wt_chiljang'
+        };
+        
+        const fileName = formTypeMap[formType] || formType;
+        const response = await fetch(`/static/data/forms/pose_data/${fileName}_ideal_data.json`);
         const data = await response.json();
         idealFrameCount = data.pose_data.length;
         console.log(`${formType} ideal video has ${idealFrameCount} frames`);
@@ -196,6 +267,46 @@ async function loadIdealData(formType) {
     } catch (error) {
         console.error(`Error loading ${formType} ideal data:`, error);
         return false;
+    }
+}
+
+function loadReferenceVideo(formType) {
+    const referenceVideoElement = document.getElementById('referenceVideo');
+    const referenceVideoSource = document.getElementById('referenceVideoSource');
+    
+    // Map form types to their reference video files
+    const videoMap = {
+        'koryo': '/static/data/forms/pose_data/wt_koreo.mp4',
+        'chiljang': '/static/data/forms/pose_data/wt-chiljang.mp4'
+    };
+    
+    const videoPath = videoMap[formType];
+    if (videoPath) {
+        referenceVideoSource.src = videoPath;
+        referenceVideoElement.load();
+        
+        // Add event listeners for video loading
+        referenceVideoElement.addEventListener('loadeddata', () => {
+            console.log(`Reference video loaded successfully for ${formType}: ${videoPath}`);
+        });
+        
+        referenceVideoElement.addEventListener('error', (e) => {
+            console.error(`Error loading reference video for ${formType}:`, e);
+            alert(`Error loading reference video for ${formType}. Please try again or contact support.`);
+        });
+        
+        // Update the form display
+        const formDisplay = document.getElementById('currentFormDisplay');
+        if (formDisplay) {
+            const displayNames = {
+                'koryo': 'Koryo',
+                'chiljang': 'Taeguk Chil Jang'
+            };
+            formDisplay.textContent = displayNames[formType] || formType.charAt(0).toUpperCase() + formType.slice(1);
+        }
+    } else {
+        console.warn(`No reference video found for form type: ${formType}`);
+        alert(`No reference video available for ${formType}. Please try another form.`);
     }
 }
 
@@ -211,25 +322,7 @@ async function setupCamera() {
         const preview = document.getElementById('preview');
         preview.srcObject = stream;
         
-        // Setup audio element with error handling
-        audioElement = new Audio('/static/data/forms/misc/pianokoreo.m4a');
-        audioElement.volume = 1.0; // Set volume to maximum
-        
-        // Add event listeners for audio debugging
-        audioElement.addEventListener('error', (e) => {
-            console.error('Audio error:', e);
-            alert('Error loading audio file. Please check the console for details.');
-        });
-        
-        audioElement.addEventListener('canplaythrough', () => {
-            console.log('Audio file loaded successfully');
-        });
-        
-        // Preload the audio
-        audioElement.load();
-        
-        // Load initial ideal data (default to koryo)
-        await loadIdealData('koryo');
+        // Don't load any form initially - wait for user selection
         
     } catch (err) {
         console.error('Error accessing camera:', err);
@@ -252,25 +345,6 @@ function showCountdown(seconds, callback) {
             overlay.style.display = 'none';
             // Start recording immediately
             callback();
-            
-            // Wait 2.5 seconds before starting audio
-            setTimeout(() => {
-                try {
-                    audioElement.currentTime = 0;
-                    const playPromise = audioElement.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log('Audio playback started successfully');
-                        }).catch(error => {
-                            console.error('Error playing audio:', error);
-                            alert('Error playing audio. Please check the console for details.');
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error starting audio:', error);
-                }
-            }, 2500); // 2.5 second delay
         }
     }
     countdownTimeout = setTimeout(next, 1000);
@@ -285,6 +359,12 @@ document.getElementById('startRecording').addEventListener('click', () => {
         recordedChunks = [];
         const preview = document.getElementById('preview');
         preview.srcObject = stream;
+        
+        // Start reference video
+        const referenceVideoElement = document.getElementById('referenceVideo');
+        referenceVideoElement.currentTime = 0;
+        referenceVideoElement.play().catch(e => console.log('Reference video autoplay blocked:', e));
+        
         mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'video/webm;codecs=vp9,opus'
         });
@@ -307,9 +387,10 @@ document.getElementById('startRecording').addEventListener('click', () => {
         };
         mediaRecorder.onstop = () => {
             clearInterval(frameInterval);
-            // Stop audio when recording stops
-            audioElement.pause();
-            audioElement.currentTime = 0;
+            
+            // Pause reference video
+            const referenceVideoElement = document.getElementById('referenceVideo');
+            referenceVideoElement.pause();
             
             const blob = new Blob(recordedChunks, {
                 type: 'video/webm'
@@ -334,6 +415,10 @@ document.getElementById('stopRecording').addEventListener('click', () => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
     }
+    // Pause reference video
+    const referenceVideoElement = document.getElementById('referenceVideo');
+    referenceVideoElement.pause();
+    
     document.getElementById('startRecording').disabled = false;
     document.getElementById('stopRecording').disabled = true;
     document.getElementById('recordingStatus').style.display = 'none';
@@ -552,7 +637,7 @@ document.getElementById('saveRecordingToLibrary').addEventListener('click', asyn
     }
 });
 
-// Add event listener for form type selection
+// Add event listener for form type selection (upload section)
 document.getElementById('formType').addEventListener('change', async function(e) {
     const formType = e.target.value;
     if (formType) {
@@ -560,6 +645,28 @@ document.getElementById('formType').addEventListener('change', async function(e)
         if (!success) {
             alert(`Error loading ideal data for ${formType}. Please try another form or contact support.`);
         }
+        loadReferenceVideo(formType);
+    }
+});
+
+// Add event listener for form selection prompt
+document.getElementById('formTypePrompt').addEventListener('change', async function(e) {
+    const formType = e.target.value;
+    if (formType) {
+        // Show reference video section
+        document.getElementById('referenceVideoSection').style.display = 'block';
+        document.getElementById('formSelectionPrompt').style.display = 'none';
+        
+        // Load ideal data and reference video
+        const success = await loadIdealData(formType);
+        if (!success) {
+            alert(`Error loading ideal data for ${formType}. Please try another form or contact support.`);
+            return;
+        }
+        loadReferenceVideo(formType);
+        
+        // Also update the upload form's form type
+        document.getElementById('formType').value = formType;
     }
 });
 

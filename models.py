@@ -114,3 +114,40 @@ class Message(db.Model):
 
     def __repr__(self):
         return f'<Message {self.id}>'
+
+
+class VideoComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    video_id = db.Column(db.Integer, db.ForeignKey('library_item.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    timestamp = db.Column(db.Float, nullable=False)  # Time in seconds
+    comment = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relationships
+    video = db.relationship('LibraryItem', backref=db.backref('comments', lazy=True))
+    admin = db.relationship('User', backref=db.backref('video_comments', lazy=True))
+    
+    def __repr__(self):
+        return f'<VideoComment {self.id}>'
+
+
+class CustomEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    event_date = db.Column(db.Date, nullable=False)
+    event_time = db.Column(db.Time)  # Optional time
+    location = db.Column(db.String(200))
+    event_type = db.Column(db.String(50), default='general')  # 'class', 'competition', 'seminar', etc.
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    is_all_day = db.Column(db.Boolean, default=True)
+    send_to_all = db.Column(db.Boolean, default=True)  # Send to all students
+    target_students = db.Column(db.JSON)  # List of student IDs for targeted events
+    
+    # Relationships
+    creator = db.relationship('User', backref=db.backref('created_events', lazy=True))
+    
+    def __repr__(self):
+        return f'<CustomEvent {self.title}>'
