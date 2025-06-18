@@ -498,12 +498,21 @@ def process_form_comparison():
             rhythm_file.save(rhythm_path)
 
         # Check if ideal data exists for this form
-        ideal_data_path = os.path.join(app.static_folder, 'data', 'forms', 'pose_data', f'{form_type}_ideal_data.json')
+        # Map form types to their actual file names
+        form_type_map = {
+            'koryo': 'koryo',
+            'keumgang': 'keumgang', 
+            'taebaek': 'taebaek',
+            'chiljang': 'wt_chiljang'
+        }
+        
+        file_name = form_type_map.get(form_type, form_type)
+        ideal_data_path = os.path.join(app.static_folder, 'data', 'forms', 'pose_data', f'{file_name}_ideal_data.json')
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type}'}), 400
 
         # Process the video
-        form_comparison = FormComparison()
+        form_comparison = FormComparison(ideal_data_path=ideal_data_path)
         result_video_path, feature_vectors = form_comparison.process_user_video(
             user_video_path=mp4_path,
             output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),

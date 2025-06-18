@@ -94,6 +94,7 @@
                                 <option value="koryo">Koryo</option>
                                 <option value="keumgang">Keumgang</option>
                                 <option value="taebaek">Taebaek</option>
+                                <option value="chiljang">Taeguk Chil Jang</option>
                             </select>
                         </div>
                         
@@ -188,7 +189,16 @@ let idealFrameCount = 0;
 
 async function loadIdealData(formType) {
     try {
-        const response = await fetch(`/static/data/forms/pose_data/${formType}_ideal_data.json`);
+        // Map form types to their actual file names
+        const formTypeMap = {
+            'koryo': 'koryo',
+            'keumgang': 'keumgang', 
+            'taebaek': 'taebaek',
+            'chiljang': 'wt_chiljang'
+        };
+        
+        const fileName = formTypeMap[formType] || formType;
+        const response = await fetch(`/static/data/forms/pose_data/${fileName}_ideal_data.json`);
         const data = await response.json();
         idealFrameCount = data.pose_data.length;
         console.log(`${formType} ideal video has ${idealFrameCount} frames`);
