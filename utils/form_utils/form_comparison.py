@@ -57,7 +57,12 @@ class FormComparison:
              for lm in f['landmarks']]
             for f in self.pose_data
         ])
-    
+
+        # Initialize scale smoothing variables
+        self.last_vertical_scale = 1.0
+        self.last_horizontal_scale = 1.0
+        self.smoothing_factor = 0.3  # Lower = more smoothing
+
     def is_valid_point(self, x, y, frame_shape):
         """Check if a point is within the frame bounds."""
         return (0 <= x < frame_shape[1] and 0 <= y < frame_shape[0])
@@ -93,7 +98,7 @@ class FormComparison:
         # Increase vertical scale by 20% and reduce horizontal scale
         vertical_scale = height_scale * 1  # Stretch vertically
         horizontal_scale = width_scale * 0.9  # Compress horizontally
-        
+
         # Add safeguards against extreme scaling
         vertical_scale = max(0.8, min(vertical_scale, 1.8))  # Increased minimum scale
         horizontal_scale = max(0.8, min(horizontal_scale, 1.8))  # Increased minimum scale
@@ -290,11 +295,6 @@ class FormComparison:
                             self.mp_pose.POSE_CONNECTIONS,
                             self.ideal_drawing_spec
                         )
-
-                        # Update ideal frame index
-                        ideal_frame_index += 1
-                        if ideal_frame_index >= len(self.ideal_data['pose_data']):
-                            break
 
                         user_pts_arr = np.array([[lm['x'], lm['y']] for lm in user_landmarks])
                         ideal_pts_arr = np.array([[lm['x'], lm['y']] for lm in aligned_ideal])

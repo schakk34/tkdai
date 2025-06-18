@@ -7,7 +7,7 @@ import time
 
 
 '''
-used for extracting picture data
+
 '''
 class FormDataExtractor:
     def __init__(self, video_path, form_name):
