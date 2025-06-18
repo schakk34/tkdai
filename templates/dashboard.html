@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - TKD AI{% endblock %}
+{% block title %}Dashboard - Kihap{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -76,22 +76,76 @@
         </div>
     </div>
     
-    <!-- WT Calendar and Events Section -->
+    <!-- Calendar and Events Section -->
     <div class="row mt-4">
-        <!-- Activity Calendar -->
+        <!-- Events Calendar -->
         <div class="col-md-5">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <i class="fas fa-calendar-check me-2"></i>Your Activity
+                        <i class="fas fa-calendar-check me-2"></i>Events Calendar
                     </h5>
                     <div id="calendar"></div>
                 </div>
             </div>
         </div>
         
-        <!-- WT Events -->
+        <!-- Events Lists -->
         <div class="col-md-7">
+            <!-- Custom Events -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-calendar-plus me-2"></i>Class Events
+                    </h5>
+                    {% if custom_events %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                        <th>Date</th>
+                                        <th>Location</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in custom_events %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ event.title }}</strong>
+                                                {% if event.description %}
+                                                    <br><small class="text-dark">{{ event.description[:50] }}{% if event.description|length > 50 %}...{% endif %}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ event.event_date.strftime('%Y-%m-%d') }}
+                                                {% if not event.is_all_day and event.event_time %}
+                                                    <br><small class="text-muted">{{ event.event_time.strftime('%H:%M') }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if event.location %}
+                                                    {{ event.location }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">{{ event.event_type|title }}</span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No class events scheduled.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- WT Events -->
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">
@@ -99,7 +153,7 @@
                     </h5>
                     {% if wt_events %}
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="table">
                                 <thead>
                                     <tr>
                                         <th>Event</th>
@@ -127,7 +181,7 @@
                             </table>
                         </div>
                     {% else %}
-                        <p class="text-muted">No upcoming events found.</p>
+                        <p class="text-muted">No upcoming WT events found.</p>
                     {% endif %}
                     <a href="https://www.worldtaekwondo.org/calendar/cld_index.html" target="_blank" class="btn btn-outline-primary mt-3">
                         <i class="fas fa-external-link-alt me-1"></i>View Full Calendar
@@ -167,15 +221,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Sample data for testing
-        var sampleEvents = [
-            {
-                title: 'Logged in',
-                start: new Date(),
-                allDay: true
-            }
-        ];
-        
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: {
@@ -184,10 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 right: 'dayGridMonth'
             },
             events: function(info, successCallback, failureCallback) {
-                // First show sample data
-                successCallback(sampleEvents);
-                
-                // Then fetch real data
+                // Fetch custom events
                 fetch('/get_user_activity')
                     .then(response => response.json())
                     .then(data => {
@@ -198,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         failureCallback(error);
                     });
             },
-            eventColor: '#dc3545',
+            eventColor: '#28a745',
             eventDisplay: 'background',
             height: 'auto',
             contentHeight: 'auto',
