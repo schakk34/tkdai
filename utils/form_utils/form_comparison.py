@@ -364,6 +364,7 @@ class FormComparison:
                 audio.close()
             
             print(f"✅ Comparison video saved to {output_path}")
+            print(all_feature_vectors[:3])
             return output_path, all_feature_vectors
             
         except Exception as e:
