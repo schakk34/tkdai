@@ -124,6 +124,13 @@ class VideoComment(db.Model):
     comment = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     
+    # Annotation fields
+    has_annotation = db.Column(db.Boolean, default=False)  # Whether this comment has a visual annotation
+    annotation_x = db.Column(db.Float)  # X coordinate of circle center (percentage of video width)
+    annotation_y = db.Column(db.Float)  # Y coordinate of circle center (percentage of video height)
+    annotation_radius = db.Column(db.Float, default=5.0)  # Radius of circle (percentage of video width)
+    annotation_color = db.Column(db.String(7), default='#ff0000')  # Color of circle (hex)
+    
     # Relationships
     video = db.relationship('LibraryItem', backref=db.backref('comments', lazy=True))
     admin = db.relationship('User', backref=db.backref('video_comments', lazy=True))

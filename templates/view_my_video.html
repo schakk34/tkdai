@@ -18,6 +18,33 @@
         max-height: 600px;
         object-fit: contain;
     }
+    .video-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .annotation-circle {
+        position: absolute;
+        border: 3px solid;
+        border-radius: 50%;
+        pointer-events: auto;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        animation: pulse 2s infinite;
+    }
+    .annotation-circle:hover {
+        transform: scale(1.1);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    @keyframes pulse {
+        0% { opacity: 0.7; }
+        50% { opacity: 1; }
+        100% { opacity: 0.7; }
+    }
     .comment-section {
         max-height: 400px;
         overflow-y: auto;
@@ -27,6 +54,10 @@
         padding: 10px;
         margin-bottom: 10px;
         background-color: #f8f9fa;
+    }
+    .comment-item.has-annotation {
+        border-left-color: #dc3545;
+        background-color: #fff5f5;
     }
     .comment-timestamp {
         color: #6c757d;
@@ -38,6 +69,14 @@
     }
     .comment-actions {
         margin-top: 5px;
+    }
+    .annotation-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+        border: 2px solid #dc3545;
     }
     .progress-bar-container {
         position: relative;
@@ -112,6 +151,7 @@
                             <source src="{{ video.file_path }}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
+                        <div class="video-overlay" id="videoOverlay"></div>
                     </div>
                     
                     <!-- Progress Bar with Comment Dots -->
@@ -125,7 +165,8 @@
                         {% if comments %}
                             <div class="alert alert-info mt-2">
                                 <i class="fas fa-info-circle me-2"></i>
-                                Click on the red dots in the progress bar to jump to instructor comments.
+                                Click on the red dots in the progress bar to jump to instructor comments. 
+                                <i class="fas fa-circle me-1"></i>Circles on the video indicate visual feedback.
                             </div>
                         {% endif %}
                     </div>
@@ -143,8 +184,11 @@
                     <div class="comment-section" id="commentsList">
                         {% if comments %}
                             {% for comment in comments %}
-                            <div class="comment-item" data-comment-id="{{ comment.id }}" data-timestamp="{{ comment.timestamp }}">
+                            <div class="comment-item {% if comment.has_annotation %}has-annotation{% endif %}" data-comment-id="{{ comment.id }}" data-timestamp="{{ comment.timestamp }}">
                                 <div class="comment-timestamp">
+                                    {% if comment.has_annotation %}
+                                        <span class="annotation-indicator" style="background-color: {{ comment.annotation_color }};"></span>
+                                    {% endif %}
                                     {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.admin.username }}
                                 </div>
                                 <div class="comment-text">{{ comment.comment }}</div>
@@ -207,8 +251,33 @@ function loadComments() {
         .then(data => {
             comments = data;
             updateCommentDots();
+            updateAnnotations();
         })
         .catch(error => console.error('Error loading comments:', error));
+}
+
+function updateAnnotations() {
+    const overlay = document.getElementById('videoOverlay');
+    overlay.innerHTML = '';
+    
+    comments.forEach(comment => {
+        if (comment.has_annotation && comment.annotation) {
+            const circle = document.createElement('div');
+            circle.className = 'annotation-circle';
+            circle.style.left = comment.annotation.x + '%';
+            circle.style.top = comment.annotation.y + '%';
+            circle.style.width = (comment.annotation.radius * 2) + '%';
+            circle.style.height = (comment.annotation.radius * 2) + '%';
+            circle.style.borderColor = comment.annotation.color;
+            circle.style.backgroundColor = comment.annotation.color + '20';
+            
+            circle.addEventListener('click', function() {
+                videoPlayer.currentTime = comment.timestamp;
+            });
+            
+            overlay.appendChild(circle);
+        }
+    });
 }
 
 function updateCommentDots() {
@@ -243,6 +312,7 @@ function formatTime(seconds) {
 // Update comment dots when video metadata is loaded
 videoPlayer.addEventListener('loadedmetadata', function() {
     updateCommentDots();
+    updateAnnotations();
 });
 </script>
 {% endblock %} 

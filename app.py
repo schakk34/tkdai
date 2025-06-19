@@ -585,38 +585,21 @@ def allowed_file(filename):
 # Initialize the form analyzer
 form_analyzer = FormAnalyzer()
 
-# @app.route('/analyze-form', methods=['POST'])
-# @login_required
-# def analyze_form():
-#     try:
-#         data = request.get_json()
-#         video_url = data.get('video_url')
-#
-#         if not video_url:
-#             return jsonify({'error': 'No video URL provided'}), 400
-#
-#         # Analyze the form using HuggingFace API
-#         result = form_analyzer.analyze_form(video_url)
-#
-#         if result['success']:
-#             return jsonify(result)
-#         else:
-#             return jsonify({'error': result['error']}), 500
-#
-#     except Exception as e:
-#         print(f"Error in analyze-form endpoint: {str(e)}")
-#         return jsonify({'error': 'Failed to analyze form'}), 500
-
 @app.route('/analyze-form', methods=['POST'])
 @login_required
 def analyze_form():
     data = request.get_json()
-    fvs = data.get('feature_vectors')
-    if not fvs:
+    video_url = data.get('video_url')
+    feature_vectors = data.get('feature_vectors', [])
+    
+    if not video_url:
+        return jsonify({'success': False, 'error': 'No video URL provided'}), 400
+    
+    if not feature_vectors:
         return jsonify({'success': False, 'error': 'No feature vectors received'}), 400
 
-    analyzer = FormAnalyzer(provider='gemini')
-    feedback = analyzer.analyze(fvs)
+    # analyzer = FormAnalyzer(provider='gemini')
+    feedback = "Form analysis feedback will be generated here"
     return jsonify({'success': True, 'feedback': feedback})
 
 @app.route('/library')
@@ -1115,10 +1098,6 @@ def admin_view_student_video(user_id, video_id):
         return redirect(url_for('admin_users'))
     
     video = LibraryItem.query.get_or_404(video_id)
-    if video.user_id != user_id:
-        flash('Video does not belong to this user.')
-        return redirect(url_for('admin_users'))
-    
     if video.item_type != 'video':
         flash('This item is not a video.')
         return redirect(url_for('admin_users'))
@@ -1142,7 +1121,14 @@ def get_video_comments(video_id):
         'timestamp': comment.timestamp,
         'comment': comment.comment,
         'created_at': comment.created_at.isoformat(),
-        'admin_name': comment.admin.username
+        'admin_name': comment.admin.username,
+        'has_annotation': comment.has_annotation,
+        'annotation': {
+            'x': comment.annotation_x,
+            'y': comment.annotation_y,
+            'radius': comment.annotation_radius,
+            'color': comment.annotation_color
+        } if comment.has_annotation else None
     } for comment in comments])
 
 @app.route('/api/video/<int:video_id>/comments', methods=['POST'])
@@ -1153,6 +1139,7 @@ def add_video_comment(video_id):
     data = request.get_json()
     timestamp = data.get('timestamp')
     comment_text = data.get('comment')
+    annotation_data = data.get('annotation')  # New annotation data
     
     if not timestamp or not comment_text:
         return jsonify({'error': 'Timestamp and comment are required'}), 400
@@ -1174,6 +1161,14 @@ def add_video_comment(video_id):
         comment=comment_text
     )
     
+    # Handle annotation data if provided
+    if annotation_data:
+        new_comment.has_annotation = True
+        new_comment.annotation_x = annotation_data.get('x')
+        new_comment.annotation_y = annotation_data.get('y')
+        new_comment.annotation_radius = annotation_data.get('radius', 5.0)
+        new_comment.annotation_color = annotation_data.get('color', '#ff0000')
+    
     db.session.add(new_comment)
     db.session.commit()
     
@@ -1182,7 +1177,14 @@ def add_video_comment(video_id):
         'timestamp': new_comment.timestamp,
         'comment': new_comment.comment,
         'created_at': new_comment.created_at.isoformat(),
-        'admin_name': current_user.username
+        'admin_name': current_user.username,
+        'has_annotation': new_comment.has_annotation,
+        'annotation': {
+            'x': new_comment.annotation_x,
+            'y': new_comment.annotation_y,
+            'radius': new_comment.annotation_radius,
+            'color': new_comment.annotation_color
+        } if new_comment.has_annotation else None
     })
 
 @app.route('/api/comment/<int:comment_id>', methods=['DELETE'])
