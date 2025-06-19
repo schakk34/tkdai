@@ -12,7 +12,7 @@
                     <h5 class="mb-0">Send Announcement to All Students</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('admin_send_announcement') }}" method="POST">
+                    <form action="{{ url_for('master_send_announcement') }}" method="POST">
                         <div class="mb-3">
                             <label for="announcement" class="form-label">Announcement Message</label>
                             <textarea class="form-control" id="announcement" name="message" rows="3" required 
@@ -65,7 +65,7 @@
                         {% endif %}
 
                         <!-- Send Message Form -->
-                        <form action="{{ url_for('admin_send_message', user_id=selected_user.id) }}" method="POST" class="mt-4">
+                        <form action="{{ url_for('master_send_message', user_id=selected_user.id) }}" method="POST" class="mt-4">
                             <div class="mb-3">
                                 <label for="message" class="form-label">Send Message</label>
                                 <textarea class="form-control" id="message" name="message" rows="3" required></textarea>
@@ -89,7 +89,7 @@
                     {% if users %}
                         <div class="list-group list-group-flush">
                             {% for user in users %}
-                            <a href="{{ url_for('admin_messages', user_id=user.id) }}" 
+                            <a href="{{ url_for('master_messages', user_id=user.id) }}"
                                class="list-group-item list-group-item-action {% if selected_user and selected_user.id == user.id %}active{% endif %}">
                                 <div class="d-flex w-100 justify-content-between align-items-center">
                                     <div>

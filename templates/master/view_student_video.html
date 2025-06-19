@@ -175,9 +175,9 @@
         <div class="col-12">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin_users') }}">Students</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('master_dashboard') }}">Admin Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('master_users') }}">Students</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('master_user_detail', user_id=user.id) }}">{{ user.username }}</a></li>
                     <li class="breadcrumb-item active">Video: {{ video.title }}</li>
                 </ol>
             </nav>
@@ -289,7 +289,7 @@
                                     <button class="btn btn-sm btn-outline-primary goto-time-btn" data-timestamp="{{ comment.timestamp }}">
                                         <i class="fas fa-play me-1"></i>Go to Time
                                     </button>
-                                    {% if comment.admin_id == current_user.id %}
+                                    {% if comment.master_id == current_user.id %}
                                     <button class="btn btn-sm btn-outline-danger delete-comment-btn" data-comment-id="{{ comment.id }}">
                                         <i class="fas fa-trash me-1"></i>Delete
                                     </button>
@@ -651,7 +651,7 @@ function updateCommentDots() {
         const dot = document.createElement('div');
         dot.className = 'comment-dot';
         dot.style.left = `${(comment.timestamp / videoPlayer.duration) * 100}%`;
-        dot.title = `${comment.admin_name}: ${comment.comment.substring(0, 50)}...`;
+        dot.title = `${comment.master_name}: ${comment.comment.substring(0, 50)}...`;
         
         dot.addEventListener('click', function() {
             videoPlayer.currentTime = comment.timestamp;
@@ -675,14 +675,14 @@ function updateCommentsList() {
         <div class="comment-item ${comment.has_annotation ? 'has-annotation' : ''}" data-comment-id="${comment.id}" data-timestamp="${comment.timestamp}">
             <div class="comment-timestamp">
                 ${comment.has_annotation ? `<span class="annotation-indicator" style="background-color: ${comment.annotation.color};"></span>` : ''}
-                ${comment.timestamp.toFixed(1)}s - ${comment.admin_name}
+                ${comment.timestamp.toFixed(1)}s - ${comment.master_name}
             </div>
             <div class="comment-text">${comment.comment}</div>
             <div class="comment-actions">
                 <button class="btn btn-sm btn-outline-primary goto-time-btn" data-timestamp="${comment.timestamp}">
                     <i class="fas fa-play me-1"></i>Go to Time
                 </button>
-                ${comment.admin_name === '{{ current_user.username }}' ? 
+                ${comment.master_name === '{{ current_user.username }}' ?
                     `<button class="btn btn-sm btn-outline-danger delete-comment-btn" data-comment-id="${comment.id}">
                         <i class="fas fa-trash me-1"></i>Delete
                     </button>` : ''

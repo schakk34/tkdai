@@ -8,7 +8,7 @@
         <div class="col">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('master_dashboard') }}">Dashboard</a></li>
                     <li class="breadcrumb-item active" aria-current="page">Calendar Management</li>
                 </ol>
             </nav>
@@ -23,7 +23,7 @@
                     <h5 class="mb-0">Add New Event</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('admin_add_event') }}" method="POST">
+                    <form action="{{ url_for('master_add_event') }}" method="POST">
                         <div class="mb-3">
                             <label for="title" class="form-label">Event Title *</label>
                             <input type="text" class="form-control" id="title" name="title" required>
@@ -191,7 +191,7 @@
                 <h5 class="modal-title">Edit Event</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ url_for('admin_edit_event', event_id=event.id) }}" method="POST">
+            <form action="{{ url_for('master_edit_event', event_id=event.id) }}" method="POST">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -296,7 +296,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form action="{{ url_for('admin_delete_event', event_id=event.id) }}" method="POST" style="display: inline;">
+                <form action="{{ url_for('master_delete_event', event_id=event.id) }}" method="POST" style="display: inline;">
                     <button type="submit" class="btn btn-danger">Delete Event</button>
                 </form>
             </div>

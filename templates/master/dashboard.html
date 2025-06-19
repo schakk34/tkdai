@@ -59,7 +59,7 @@
                 <div class="card-body">
                     <h5 class="card-title">Calendar Events</h5>
                     <p class="card-text display-4">{{ current_user.created_events|length }}</p>
-                    <a href="{{ url_for('admin_calendar') }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url_for('master_calendar') }}" class="btn btn-primary btn-sm">
                         <i class="fas fa-calendar-plus me-1"></i>Manage Events
                     </a>
                 </div>
@@ -216,7 +216,7 @@
                 <h5 class="modal-title" id="messageModalLabel{{ student.id }}">Send Message to {{ student.username }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('admin_send_message', user_id=student.id) }}" method="POST">
+            <form action="{{ url_for('master_send_message', user_id=student.id) }}" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="message{{ student.id }}" class="form-label">Message</label>

@@ -228,7 +228,7 @@ def login():
     return render_template('login.html')
 
 
-def admin_required(f):
+def admin_required(f: object) -> object:
     @wraps(f)
     def decorated(*args, **kwargs):
         if not (current_user.is_authenticated and current_user.is_admin()):
