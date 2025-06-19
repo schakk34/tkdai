@@ -8,7 +8,7 @@ db = SQLAlchemy()
 
 class Role(enum.Enum):
     STUDENT = 'student'
-    TEACHER = 'teacher'
+    MASTER = 'master'
     ADMIN = 'admin'
 
 # Update User model to work with Flask-Login
@@ -47,8 +47,8 @@ class User(UserMixin, db.Model):
     def is_student(self):
         return self.role == Role.STUDENT
 
-    def is_teacher(self):
-        return self.role == Role.TEACHER
+    def is_master(self):
+        return self.role == Role.MASTER
 
     def is_admin(self):
         return self.role == Role.ADMIN
@@ -64,9 +64,6 @@ class User(UserMixin, db.Model):
 
     def get_id(self):
         return str(self.id)
-
-    def is_administrator(self):
-        return self.is_admin
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import wraps
 
 import cv2
-from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -19,7 +19,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
-from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent
+from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, Role
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -103,6 +103,45 @@ def generate_frames():
 def landing():
     return render_template('landing.html')
 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        # Check if username already exists
+        if User.query.filter_by(username=request.form['username']).first():
+            flash('Username already exists. Please choose a different one.')
+            return render_template('signup.html')
+
+        # Check if email already exists
+        if User.query.filter_by(email=request.form['email']).first():
+            flash('Email already registered. Please use a different email or login.')
+            return render_template('signup.html')
+
+        # Verify class code
+        class_code = request.form.get('class_code')
+        admin_user = User.query.filter_by(class_code=class_code, is_admin=True).first()
+        if not admin_user:
+            flash('Invalid class code. Please check with your instructor.')
+            return render_template('signup.html')
+
+        try:
+            hashed_password = generate_password_hash(request.form['password'])
+            new_user = User(
+                username=request.form['username'],
+                email=request.form['email'],
+                password_hash=hashed_password,
+                belt_rank=request.form.get('belt_rank', 'White')
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Account created successfully! Please login.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while creating your account. Please try again.')
+            return render_template('signup.html')
+
+    return render_template('signup.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     # Debug: Print all users in database
@@ -185,44 +224,39 @@ def login():
 
     return render_template('login.html')
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not (current_user.is_authenticated and current_user.is_admin()):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/create-master', methods=['GET','POST'])
+@login_required
+@admin_required
+def create_master():
+    if not current_user.is_admin():
+        flash("Only administrators may create master accounts.")
+        return redirect(url_for('dashboard'))
+
     if request.method == 'POST':
-        # Check if username already exists
-        if User.query.filter_by(username=request.form['username']).first():
-            flash('Username already exists. Please choose a different one.')
-            return render_template('signup.html')
+        # validate form…
+        user = User(
+            username=request.form.username.data,
+            email=request.form.email.data,
+            role=Role.MASTER
+        )
+        user.set_password(request.form.get('password'))
+        # generate that master's class_code
+        user.generate_class_code()
+        db.session.add(user)
+        db.session.commit()
+        flash("Master account created!")
+        return redirect(url_for('dashboard'))
 
-        # Check if email already exists
-        if User.query.filter_by(email=request.form['email']).first():
-            flash('Email already registered. Please use a different email or login.')
-            return render_template('signup.html')
-
-        # Verify class code
-        class_code = request.form.get('class_code')
-        admin_user = User.query.filter_by(class_code=class_code, is_admin=True).first()
-        if not admin_user:
-            flash('Invalid class code. Please check with your instructor.')
-            return render_template('signup.html')
-
-        try:
-            hashed_password = generate_password_hash(request.form['password'])
-            new_user = User(
-                username=request.form['username'],
-                email=request.form['email'],
-                password_hash=hashed_password,
-                belt_rank=request.form.get('belt_rank', 'White')
-            )
-            db.session.add(new_user)
-            db.session.commit()
-            flash('Account created successfully! Please login.')
-            return redirect(url_for('login'))
-        except Exception as e:
-            db.session.rollback()
-            flash('An error occurred while creating your account. Please try again.')
-            return render_template('signup.html')
-
-    return render_template('signup.html')
+    return render_template('create_master.html')
 
 @app.route('/logout')
 @login_required
