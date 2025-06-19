@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Student Progress - TKD AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">Student Details</a></li>
+                    <li class="breadcrumb-item active">Progress</li>
+                </ol>
+            </nav>
+            <h1>Student Progress</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Student Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Name</dt>
+                        <dd class="col-sm-8">{{ user.username }}</dd>
+                        
+                        <dt class="col-sm-4">Belt Rank</dt>
+                        <dd class="col-sm-8">{{ user.belt_rank }}</dd>
+                        
+                        <dt class="col-sm-4">Total Practice</dt>
+                        <dd class="col-sm-8">{{ progress_data|length }} sessions</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Technique Summary</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Technique</th>
+                                    <th>Best Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set techniques = {} %}
+                                {% for progress in progress_data %}
+                                    {% if progress.technique not in techniques or progress.score > techniques[progress.technique] %}
+                                        {% set _ = techniques.update({progress.technique: progress.score}) %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% for technique, score in techniques.items() %}
+                                <tr>
+                                    <td>{{ technique }}</td>
+                                    <td>{{ score }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Progress History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Technique</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for progress in progress_data|sort(attribute='date', reverse=true) %}
+                                <tr>
+                                    <td>{{ progress.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ progress.technique }}</td>
+                                    <td>{{ progress.score }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
