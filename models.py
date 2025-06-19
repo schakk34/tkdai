@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Enum as SAEnum
 from datetime import datetime
 import enum
 from flask_login import UserMixin
@@ -9,7 +10,7 @@ db = SQLAlchemy()
 class Role(enum.Enum):
     STUDENT = 'student'
     MASTER = 'master'
-    ADMIN = 'admin'
+    ADMIN = 'master'
 
 # Update User model to work with Flask-Login
 class User(UserMixin, db.Model):
@@ -20,7 +21,11 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     belt_rank = db.Column(db.String(20), default='White')
-    role = db.Column(db.Enum(Role), default=Role.STUDENT, nullable=False)
+    role = db.Column(
+        SAEnum(Role, name="role_enum", native_enum=False),
+        default=Role.STUDENT,
+        nullable=False
+    )
     class_code = db.Column(db.String(10), unique=True, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -41,7 +46,7 @@ class User(UserMixin, db.Model):
 
     sent_messages = db.relationship('Message', foreign_keys='Message.sender_id', backref='sender', lazy=True)
     received_messages = db.relationship('Message', foreign_keys='Message.receiver_id', backref='receiver', lazy=True)
-    video_comments = db.relationship('VideoComment', backref='admin', lazy=True)
+    video_comments = db.relationship('VideoComment', backref='master', lazy=True)
     created_events = db.relationship('CustomEvent', backref='creator', lazy=True)
 
     def is_student(self):
