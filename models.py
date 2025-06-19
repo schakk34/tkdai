@@ -174,3 +174,41 @@ class CustomEvent(db.Model):
     
     def __repr__(self):
         return f'<CustomEvent {self.title}>'
+
+
+class PracticeVideo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    video_url = db.Column(db.String(500), nullable=False)
+    thumbnail_url = db.Column(db.String(500))  # Optional thumbnail
+    duration = db.Column(db.Integer)  # Duration in seconds
+    tags = db.Column(db.JSON)  # List of tags like ['sparring', 'poomsae', 'demo']
+    creators = db.Column(db.JSON)  # List of creators like ['Kristopher', 'Master Kim']
+    difficulty_level = db.Column(db.String(20), default='beginner')  # beginner, intermediate, advanced
+    belt_level = db.Column(db.String(20))  # White, Yellow, Green, etc.
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    views = db.Column(db.Integer, default=0)
+    is_featured = db.Column(db.Boolean, default=False)
+    
+    def __repr__(self):
+        return f'<PracticeVideo {self.title}>'
+
+
+class VideoFavorite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    video_id = db.Column(db.Integer, db.ForeignKey('practice_video.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('favorite_videos', lazy=True))
+    video = db.relationship('PracticeVideo', backref=db.backref('favorited_by', lazy=True))
+    
+    # Ensure a user can only favorite a video once
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'video_id', name='unique_user_video_favorite'),
+    )
+    
+    def __repr__(self):
+        return f'<VideoFavorite {self.user_id}-{self.video_id}>'

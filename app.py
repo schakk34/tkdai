@@ -19,7 +19,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
-from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, Role
+from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, Role, PracticeVideo, VideoFavorite
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -403,7 +403,122 @@ def dashboard():
 @app.route('/practice')
 @login_required
 def practice():
-    return render_template('practice.html')
+    # Get all videos organized by tags
+    all_videos = PracticeVideo.query.all()
+
+    # Get user's favorite videos
+    user_favorites = VideoFavorite.query.filter_by(user_id=current_user.id).all()
+    favorite_video_ids = [fav.video_id for fav in user_favorites]
+
+    # Organize videos by tags - be more inclusive
+    sparring_videos = []
+    poomsae_videos = []
+    demo_videos = []
+
+    for video in all_videos:
+        # Check if video is favorited by current user
+        video.is_favorited = video.id in favorite_video_ids
+
+        if video.tags:
+            if 'sparring' in video.tags:
+                sparring_videos.append(video)
+            elif 'poomsae' in video.tags:
+                poomsae_videos.append(video)
+            elif 'demo' in video.tags:
+                demo_videos.append(video)
+            else:
+                # If no specific category, add to sparring as default
+                sparring_videos.append(video)
+        else:
+            # If no tags, add to sparring as default
+            sparring_videos.append(video)
+
+    # Get favorite videos for display
+    favorite_videos = [video for video in all_videos if video.id in favorite_video_ids]
+
+    # Get unique creators and their video counts
+    creator_counts = {}
+    for video in all_videos:
+        if video.creators:
+            for creator in video.creators:
+                if creator not in creator_counts:
+                    creator_counts[creator] = 0
+                creator_counts[creator] += 1
+
+    # Debug output
+    print(f"Debug - Total videos: {len(all_videos)}")
+    print(f"Debug - Creator counts: {creator_counts}")
+    print(f"Debug - User favorites: {len(favorite_videos)}")
+
+    return render_template('practice.html',
+                         sparring_videos=sparring_videos,
+                         poomsae_videos=poomsae_videos,
+                         demo_videos=demo_videos,
+                         creators=list(creator_counts.keys()),
+                         creator_counts=creator_counts,
+                         all_videos=all_videos,
+                         favorite_videos=favorite_videos)  # Pass favorite videos for display
+
+@app.route('/practice/creator/<creator_name>')
+@login_required
+def practice_creator(creator_name):
+    # Get all videos by this creator
+    # Use JSON_CONTAINS for SQLite JSON field query
+    creator_videos = PracticeVideo.query.filter(
+        PracticeVideo.creators.contains(creator_name)
+    ).all()
+
+    return render_template('practice_creator.html',
+                         creator_name=creator_name,
+                         videos=creator_videos)
+
+@app.route('/practice/video/<int:video_id>')
+@login_required
+def practice_video_detail(video_id):
+    video = PracticeVideo.query.get_or_404(video_id)
+
+    # Check if video is favorited by current user
+    video.is_favorited = VideoFavorite.query.filter_by(
+        user_id=current_user.id,
+        video_id=video_id
+    ).first() is not None
+
+    # Increment view count
+    video.views += 1
+    db.session.commit()
+
+    # Get related videos (same tags or creators)
+    # Use a simpler approach for SQLite JSON fields
+    related_videos = []
+    if video.tags or video.creators:
+        # Get all videos except the current one
+        all_videos = PracticeVideo.query.filter(PracticeVideo.id != video_id).all()
+
+        for other_video in all_videos:
+            # Check for tag overlap
+            tag_overlap = False
+            if video.tags and other_video.tags:
+                for tag in video.tags:
+                    if tag in other_video.tags:
+                        tag_overlap = True
+                        break
+
+            # Check for creator overlap
+            creator_overlap = False
+            if video.creators and other_video.creators:
+                for creator in video.creators:
+                    if creator in other_video.creators:
+                        creator_overlap = True
+                        break
+
+            if tag_overlap or creator_overlap:
+                related_videos.append(other_video)
+                if len(related_videos) >= 6:  # Limit to 6 related videos
+                    break
+
+    return render_template('practice_video_detail.html',
+                         video=video,
+                         related_videos=related_videos)
 
 @app.route('/rhythm')
 @login_required
@@ -1390,6 +1505,50 @@ def get_custom_events():
     except Exception as e:
         print(f"Error fetching custom events: {str(e)}")
         return jsonify([])
+
+@app.route('/api/video/<int:video_id>/favorite', methods=['POST'])
+@login_required
+def toggle_video_favorite(video_id):
+    """Toggle favorite status for a video"""
+    try:
+        # Check if video exists
+        video = PracticeVideo.query.get_or_404(video_id)
+
+        # Check if already favorited
+        existing_favorite = VideoFavorite.query.filter_by(
+            user_id=current_user.id,
+            video_id=video_id
+        ).first()
+
+        if existing_favorite:
+            # Remove from favorites
+            db.session.delete(existing_favorite)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'favorited': False,
+                'message': 'Removed from favorites'
+            })
+        else:
+            # Add to favorites
+            new_favorite = VideoFavorite(
+                user_id=current_user.id,
+                video_id=video_id
+            )
+            db.session.add(new_favorite)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'favorited': True,
+                'message': 'Added to favorites'
+            })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():
