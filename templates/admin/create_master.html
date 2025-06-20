@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Create Master - TKD AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Create Master Account</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('create_master') }}">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="class_code" class="form-label">Class Code</label>
+                            <input type="text" class="form-control" id="class_code" name="class_code" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Master Account</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{#{% block extra_js %}#}
+{#    <script>#}
+{#    function deleteItem(itemId) {#}
+{#        fetch(`create-master`, {#}
+{#            method: 'POST',#}
+{#            headers: {#}
+{#                'Content-Type': 'application/json'#}
+{#            }#}
+{#        })#}
+{#        .then(response => response.json())#}
+{#        .then(data => {#}
+{#            if (data.success) {#}
+{#                location.reload();#}
+{#            } else {#}
+{#                alert('Failed to delete item: ' + (data.error || 'Unknown error'));#}
+{#            }#}
+{#        })#}
+{#        .catch(error => {#}
+{#            console.error('Error:', error);#}
+{#            alert('An error occurred while deleting the item');#}
+{#        });#}
+{#    }#}
+{#    </script>#}
+{##}
+{#{% endblock %}#}

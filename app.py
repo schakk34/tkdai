@@ -116,8 +116,11 @@ def signup():
 
         # Verify class code
         class_code = request.form.get('class_code')
-        master_user = User.query.filter_by(class_code=class_code, is_master=True).first()
-        if not master_user:
+        master = User.query.filter_by(
+            class_code=class_code,
+            role=Role.MASTER
+        ).first()
+        if not master:
             flash('Invalid class code. Please check with your instructor.')
             return render_template('signup.html')
 
@@ -128,7 +131,7 @@ def signup():
                 email=request.form['email'],
                 password_hash=hashed_password,
                 belt_rank=request.form.get('belt_rank', 'White'),
-                class_code = master_user.class_code
+                teacher_id=master.id
             )
             db.session.add(new_user)
             db.session.commit()
@@ -136,6 +139,7 @@ def signup():
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
+            print(e)
             flash('An error occurred while creating your account. Please try again.')
             return render_template('signup.html')
 
@@ -234,7 +238,7 @@ def admin_required(f: object) -> object:
         return f(*args, **kwargs)
     return decorated
 
-@app.route('/create-master', methods=['GET','POST'])
+@app.route('/create_master', methods=['GET','POST'])
 @login_required
 @admin_required
 def create_master():
@@ -242,22 +246,22 @@ def create_master():
         flash("Only administrators may create master accounts.")
         return redirect(url_for('dashboard'))
 
+
     if request.method == 'POST':
         # validate form…
         user = User(
             username=request.form.get('username'),
             email=request.form.get('email'),
+            class_code=request.form.get('class_code'),
             role=Role.MASTER
         )
         user.set_password(request.form.get('password'))
         # generate that master's class_code
-        user.generate_class_code()
         db.session.add(user)
         db.session.commit()
         flash("Master account created!")
-        return redirect(url_for('dashboard'))
 
-    return render_template('create_master.html')
+    return render_template('admin/create_master.html')
 
 @app.route('/logout')
 @login_required
@@ -1569,7 +1573,32 @@ def toggle_video_favorite(video_id):
             'error': str(e)
         }), 500
 
+import click
+
+@app.cli.command("create-admin")
+@click.argument("username")
+@click.argument("email")
+@click.argument("password")
+def create_admin(username, email, password):
+    """Create an ADMIN user with a custom class code."""
+    if User.query.filter_by(username=username).first():
+        print(f"⚠️  username '{username}' already exists.")
+        return
+
+    admin = User(
+        username=username,
+        email=email,
+        role=Role.ADMIN,
+    )
+    admin.set_password(password)
+    db.session.add(admin)
+    db.session.commit()
+    print(f"✅ Created ADMIN {username!r}")
+
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5002))
     app.run(host="0.0.0.0", port=port)
+
+

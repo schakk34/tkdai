@@ -27,12 +27,14 @@ class User(UserMixin, db.Model):
         default=Role.STUDENT,
         nullable=False
     )
-    class_code = db.Column(db.String(10), unique=True, nullable=True)
+    class_code = db.Column(db.String(10), unique=True, nullable=True) # FOR MASTERS ONLYYYYYYYY
+    teacher_id = db.Column(db.Integer, db.ForeignKey('user.id'))      # FOR STUDENTS ONLY
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     star_count = db.Column(db.Integer, default=0)
 
     # Relationships
+    teacher = db.relationship('User', remote_side=[id], backref='students')
     progress = db.relationship('Progress', backref='user', lazy=True)
     library_items = db.relationship('LibraryItem', backref='user', lazy=True)
     activities = db.relationship('UserActivity', backref='user', lazy=True)
@@ -73,20 +75,23 @@ class User(UserMixin, db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
+    def set_role(self, role: str):
+        if role not in ['student', 'assistant', 'master', 'admin']:
+            print("unknown role, defaulting to student")
+            role = Role.STUDENT
+        else:
+            if role == 'student':
+                self.role = Role.STUDENT
+            elif role == 'assistant':
+                self.role = Role.ASSISTANT
+            elif role == 'master':
+                self.role = Role.MASTER
+            else:
+                self.role = Role.ADMIN
         
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-    def generate_class_code(self):
-        """Generate a fixed class code"""
-        code = "WHITE-TIGER"
-        print(f"Generated code: {code}")  # Debug log
-        
-        # Set the class code
-        self.class_code = code
-        print(f"Set class code to: {self.class_code}")  # Debug log
-        
-        return code
 
 
 class Progress(db.Model):
