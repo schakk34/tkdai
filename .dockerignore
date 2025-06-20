@@ -85,4 +85,7 @@ docker-compose.yaml
 
 # Deployment
 Procfile
-runtime.txt 
+runtime.txt
+
+# Uploads
+static/uploads/
