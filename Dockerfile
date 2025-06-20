@@ -61,7 +61,7 @@ RUN mkdir -p static/uploads static/thumbnails
 RUN chmod +x app.py
 
 # Expose port
-EXPOSE 5000
+EXPOSE 5002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
