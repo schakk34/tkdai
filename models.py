@@ -9,8 +9,9 @@ db = SQLAlchemy()
 
 class Role(enum.Enum):
     STUDENT = 'student'
+    ASSISTANT = 'assistant'
     MASTER = 'master'
-    ADMIN = 'master'
+    ADMIN = 'admin'
 
 # Update User model to work with Flask-Login
 class User(UserMixin, db.Model):

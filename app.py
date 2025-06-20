@@ -1,7 +1,6 @@
 import os
 import os.path
 import subprocess
-import time
 import math
 from datetime import datetime
 from functools import wraps
@@ -10,7 +9,6 @@ import cv2
 from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
@@ -46,9 +44,9 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-camera = None
-practice_studio = None
-white_belt_form = None
+camera: Capture
+practice_studio: PracticeStudio
+white_belt_form: WhiteBeltForm
 
 def init_camera():
     global camera, practice_studio
@@ -247,8 +245,8 @@ def create_master():
     if request.method == 'POST':
         # validate form…
         user = User(
-            username=request.form.username.data,
-            email=request.form.email.data,
+            username=request.form.get('username'),
+            email=request.form.get('email'),
             role=Role.MASTER
         )
         user.set_password(request.form.get('password'))
@@ -1114,7 +1112,7 @@ def master_download_csv(user_id):
 #             db.session.commit()
 #
 #             print(f"Successfully created master account for {username} with class code {class_code}")  # Debug log
-#             flash('Admin account created successfully! Please login.')
+#             flash('Admin account created successfully! Please log in.')
 #             return redirect(url_for('login'))
 #         except Exception as e:
 #             print(f"Error creating master account: {str(e)}")  # Debug log
