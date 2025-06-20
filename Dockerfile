@@ -10,8 +10,8 @@ ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies with better error handling
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -32,6 +32,8 @@ RUN apt-get update && apt-get install -y \
     libtiff-dev \
     libatlas-base-dev \
     gfortran \
+    curl \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
