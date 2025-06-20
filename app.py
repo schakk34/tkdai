@@ -23,10 +23,11 @@ from models import db, LibraryItem, User, Progress, UserActivity, Message, Video
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
+# Use absolute path for uploads
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # 256MB max file size
 
 # Initialize database
@@ -36,6 +37,8 @@ db.init_app(app)
 with app.app_context():
     # Only create tables if they don't exist
     db.create_all()
+    # Ensure upload folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -590,15 +593,24 @@ def process_form_comparison():
         return jsonify({'error': 'No selected file'}), 400
 
     try:
+        # Debug: Print current user id
+        print(f"Current user id: {current_user.id}")
         # Create user-specific upload directory
         user_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
+        print(f"User upload dir: {user_upload_dir}")
         os.makedirs(user_upload_dir, exist_ok=True)
 
         # Save the uploaded video
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         video_filename = f"{form_type}_{timestamp}.webm"
         video_path = os.path.join(user_upload_dir, video_filename)
-        video_file.save(video_path)
+        print(f"Saving video to: {os.path.abspath(video_path)}")  # Debug log
+        try:
+            video_file.save(video_path)
+            print(f"File exists after save? {os.path.exists(video_path)}")
+        except Exception as save_exc:
+            print(f"Exception during video_file.save: {save_exc}")
+            return jsonify({'error': f'Failed to save video: {save_exc}'}), 500
 
         # Convert webm to mp4
         mp4_filename = f"{form_type}_{timestamp}.mp4"
@@ -753,8 +765,8 @@ def save_to_library():
             file_path = file_path
         else:
             # Convert relative path to URL
-            filename = os.path.basename(file_path)
-            file_path = url_for('serve_upload', filename=filename, _external=True)
+            relative_path = os.path.relpath(file_path, app.config['UPLOAD_FOLDER'])
+            file_path = url_for('serve_upload', filename=relative_path, _external=True)
             print(f"Converted file path to URL: {file_path}")  # Debug log
         # Create new library item
         item = LibraryItem(
