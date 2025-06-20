@@ -219,7 +219,7 @@ function updateCommentDots() {
         const dot = document.createElement('div');
         dot.className = 'comment-dot';
         dot.style.left = `${(comment.timestamp / videoPlayer.duration) * 100}%`;
-        dot.title = `${comment.admin_name}: ${comment.comment.substring(0, 50)}...`;
+        dot.title = `${comment.master_name}: ${comment.comment.substring(0, 50)}...`;
         
         dot.addEventListener('click', function() {
             videoPlayer.currentTime = comment.timestamp;
