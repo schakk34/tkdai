@@ -675,15 +675,51 @@ def process_form_comparison():
             print(f"Exception during video_file.save: {save_exc}")
             return jsonify({'error': f'Failed to save video: {save_exc}'}), 500
 
-        # Convert webm to mp4
+        # Convert webm to mp4 with optimized settings for memory-constrained environments
         mp4_filename = f"{form_type}_{timestamp}.mp4"
         mp4_path = os.path.join(user_upload_dir, mp4_filename)
-        subprocess.run([
-            'ffmpeg', '-i', video_path,
-            '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
-            '-c:a', 'aac', '-b:a', '128k',
-            mp4_path
-        ], check=True)
+        
+        try:
+            # Use more memory-efficient ffmpeg settings
+            ffmpeg_cmd = [
+                'ffmpeg', '-i', video_path,
+                '-c:v', 'libx264', 
+                '-preset', 'ultrafast',  # Faster encoding, less memory
+                '-crf', '28',  # Higher CRF = smaller file, less memory
+                '-maxrate', '1M',  # Limit bitrate to reduce memory usage
+                '-bufsize', '2M',
+                '-threads', '1',  # Single thread to reduce memory usage
+                '-c:a', 'aac', 
+                '-b:a', '64k',  # Lower audio bitrate
+                '-y',  # Overwrite output file
+                mp4_path
+            ]
+            
+            print(f"Running ffmpeg command: {' '.join(ffmpeg_cmd)}")
+            
+            # Run with timeout and memory monitoring
+            result = subprocess.run(
+                ffmpeg_cmd,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout
+            )
+            
+            if result.returncode != 0:
+                print(f"FFmpeg error output: {result.stderr}")
+                raise subprocess.CalledProcessError(result.returncode, ffmpeg_cmd, result.stdout, result.stderr)
+                
+            print(f"FFmpeg conversion successful: {mp4_path}")
+            
+        except subprocess.TimeoutExpired:
+            print("FFmpeg conversion timed out")
+            return jsonify({'error': 'Video processing timed out. Please try with a shorter video.'}), 500
+        except subprocess.CalledProcessError as e:
+            print(f"FFmpeg conversion failed: {e}")
+            return jsonify({'error': f'Video conversion failed: {e.stderr}'}), 500
+        except Exception as e:
+            print(f"Unexpected error during ffmpeg conversion: {e}")
+            return jsonify({'error': f'Video processing error: {str(e)}'}), 500
 
         # Process rhythm file if provided
         rhythm_path = None
@@ -695,6 +731,7 @@ def process_form_comparison():
 
         # If this is a recording (not a form comparison), just return the converted video
         if form_type == 'recording':
+            print(f"Recording conversion successful - mp4_path: {mp4_path}")  # Debug log
             return jsonify({
                 'success': True,
                 'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
