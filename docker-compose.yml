@@ -8,9 +8,9 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_APP=app.py
+      - DATABASE_URL=postgresql://postgres.imvteekyazlzrtvooknh:Sc123034!@aws-0-us-east-1.pooler.supabase.com:6543/postgres
     volumes:
       - ./static:/app/static
-      - tkdai-data:/app/instance
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5002/"]

@@ -5,6 +5,37 @@
 - Docker and Docker Compose installed
 - At least 4GB of available RAM
 - Stable internet connection for initial build
+- Supabase PostgreSQL database (already configured)
+
+## Database Setup
+
+The application is configured to use Supabase PostgreSQL for persistent data storage.
+
+### 1. Run Database Migration
+
+Before deploying, set up your database tables:
+
+```bash
+# Run the migration script
+python migrate_db.py
+```
+
+This will:
+- Test the connection to your Supabase database
+- Create all necessary tables
+- Verify the setup
+
+### 2. Create Admin User (After First Deployment)
+
+After the application is running, create an admin user:
+
+```bash
+# Using Flask CLI
+flask create-admin <username> <email> <password>
+
+# Example:
+flask create-admin admin admin@example.com mypassword123
+```
 
 ## Quick Deployment
 
@@ -13,12 +44,17 @@
    cd tkdai
    ```
 
-2. **Run the deployment script:**
+2. **Set up the database:**
+   ```bash
+   python migrate_db.py
+   ```
+
+3. **Run the deployment script:**
    ```bash
    ./deploy.sh
    ```
 
-3. **Access the application:**
+4. **Access the application:**
    - Open your browser and go to `http://localhost:5002`
    - The application should be running and ready to use
 
@@ -26,24 +62,42 @@
 
 If you prefer to deploy manually:
 
-1. **Build the Docker image:**
+1. **Set up the database:**
+   ```bash
+   python migrate_db.py
+   ```
+
+2. **Build the Docker image:**
    ```bash
    docker-compose build --no-cache
    ```
 
-2. **Start the application:**
+3. **Start the application:**
    ```bash
    docker-compose up -d
    ```
 
-3. **Check the logs:**
+4. **Check the logs:**
    ```bash
    docker-compose logs -f
    ```
 
 ## Troubleshooting Common Issues
 
-### 1. Video Upload/Processing Issues
+### 1. Database Connection Issues
+
+**Problem:** Cannot connect to Supabase database
+
+**Solutions:**
+- Verify your Supabase connection string is correct
+- Check if your IP is whitelisted in Supabase
+- Ensure the database is active and not paused
+- Test connection manually:
+  ```bash
+  python migrate_db.py
+  ```
+
+### 2. Video Upload/Processing Issues
 
 **Problem:** Videos not saving or processing correctly
 
@@ -53,19 +107,6 @@ If you prefer to deploy manually:
 - Check Docker logs for specific error messages:
   ```bash
   docker-compose logs tkdai-app
-  ```
-
-### 2. Database Issues
-
-**Problem:** Database not persisting or connection errors
-
-**Solutions:**
-- The database is stored in a Docker volume (`tkdai-data`)
-- To reset the database, remove the volume:
-  ```bash
-  docker-compose down
-  docker volume rm tkdai_tkdai-data
-  docker-compose up -d
   ```
 
 ### 3. Port Issues
@@ -105,14 +146,18 @@ If you prefer to deploy manually:
 
 ## Environment Variables
 
-You can customize the deployment by setting environment variables:
+The application is configured with the following environment variables:
 
 ```bash
-# In docker-compose.yml or as environment variables
+# Database (already configured)
+DATABASE_URL=postgresql://postgres:Sc123034!@db.imvteekyazlzrtvooknh.supabase.co:5432/postgres
+
+# Flask settings
 FLASK_ENV=production
 FLASK_APP=app.py
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///instance/tkdai.db
+
+# Optional: Custom secret key
+SECRET_KEY=your-custom-secret-key-here
 ```
 
 ## Production Deployment
@@ -135,9 +180,7 @@ For production deployment, consider:
 
 2. **Setting up SSL certificates**
 
-3. **Using a production database (PostgreSQL/MySQL)**
-
-4. **Setting up monitoring and logging**
+3. **Setting up monitoring and logging**
 
 ## Maintenance
 
@@ -153,24 +196,30 @@ For production deployment, consider:
    ./deploy.sh
    ```
 
-### Backup and Restore
+### Database Backup
 
-**Backup:**
+Since you're using Supabase, backups are handled automatically. However, you can export data:
+
 ```bash
-# Backup database
-docker-compose exec tkdai-app sqlite3 instance/tkdai.db ".backup backup.db"
+# Export specific tables (if needed)
+docker-compose exec tkdai-app python -c "
+from app import app, db
+from models import User, LibraryItem
+import json
 
-# Backup uploads
-tar -czf uploads-backup.tar.gz static/uploads/
+with app.app_context():
+    users = User.query.all()
+    data = [{'id': u.id, 'username': u.username, 'email': u.email} for u in users]
+    with open('users_backup.json', 'w') as f:
+        json.dump(data, f)
+"
 ```
 
-**Restore:**
-```bash
-# Restore database
-docker-compose exec tkdai-app sqlite3 instance/tkdai.db ".restore backup.db"
+### File Backup
 
-# Restore uploads
-tar -xzf uploads-backup.tar.gz
+```bash
+# Backup uploads
+tar -czf uploads-backup.tar.gz static/uploads/
 ```
 
 ## Support
@@ -178,8 +227,8 @@ tar -xzf uploads-backup.tar.gz
 If you encounter issues not covered in this guide:
 
 1. Check the Docker logs: `docker-compose logs tkdai-app`
-2. Verify all prerequisites are met
-3. Ensure sufficient system resources
+2. Verify database connection: `python migrate_db.py`
+3. Ensure all prerequisites are met
 4. Check the application logs for specific error messages
 
 ## Security Notes
@@ -187,4 +236,5 @@ If you encounter issues not covered in this guide:
 - The application runs as a non-root user in the container
 - File uploads are restricted to 256MB maximum
 - Session cookies are configured for security in production
-- Database is stored in a Docker volume for persistence 
+- Database is stored in Supabase with automatic backups
+- Connection string includes credentials (consider using environment variables for production) 

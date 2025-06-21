@@ -19,14 +19,16 @@ from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
 from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, Role, PracticeVideo, VideoFavorite
 from white_belt_form import WhiteBeltForm
+from config import config
+
+# Determine the configuration to use
+config_name = os.environ.get('FLASK_ENV', 'development')
+if config_name == 'production':
+    config_name = 'docker'  # Use Docker config for production
 
 app = Flask(__name__)
-# Use absolute path for uploads
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
-app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # 256MB max file size
+app.config.from_object(config[config_name])
+config[config_name].init_app(app)
 
 # Initialize database
 db.init_app(app)

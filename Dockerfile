@@ -5,6 +5,7 @@ FROM python:3.10-slim as builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libpq-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -51,6 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtk-3-0 \
     libgstreamer1.0-0 \
     libgstreamer-plugins-base1.0-0 \
+    libpq5 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

@@ -31,7 +31,8 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///tkdai.db'
+    # Use Supabase Transaction Pooler for better IPv4 compatibility
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres.imvteekyazlzrtvooknh:Sc123034!@aws-0-us-east-1.pooler.supabase.com:6543/postgres'
     
     # Production-specific settings
     SESSION_COOKIE_SECURE = True
@@ -45,8 +46,8 @@ class ProductionConfig(Config):
 
 class DockerConfig(ProductionConfig):
     """Docker-specific configuration"""
-    # Use environment variables for Docker deployment
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///instance/tkdai.db'
+    # Use Supabase Transaction Pooler for Docker deployment
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres.imvteekyazlzrtvooknh:Sc123034!@aws-0-us-east-1.pooler.supabase.com:6543/postgres'
     
     @staticmethod
     def init_app(app):
