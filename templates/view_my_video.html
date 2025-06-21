@@ -189,7 +189,7 @@
                                     {% if comment.has_annotation %}
                                         <span class="annotation-indicator" style="background-color: {{ comment.annotation_color }};"></span>
                                     {% endif %}
-                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.admin.username }}
+                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.master.username }}
                                 </div>
                                 <div class="comment-text">{{ comment.comment }}</div>
                                 <div class="comment-actions">

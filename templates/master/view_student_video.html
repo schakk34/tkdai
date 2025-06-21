@@ -282,7 +282,7 @@
                                     {% if comment.has_annotation %}
                                         <span class="annotation-indicator" style="background-color: {{ comment.annotation_color }};"></span>
                                     {% endif %}
-                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.admin.username }}
+                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.master.username }}
                                 </div>
                                 <div class="comment-text">{{ comment.comment }}</div>
                                 <div class="comment-actions">
@@ -311,7 +311,7 @@
 {% block extra_js %}
 <script>
 let videoPlayer;
-let comments = [];
+let comments = [];  // Ensure comments is always initialized as an array
 let currentCommentTimestamp = 0;
 let isAddingAnnotation = false;
 let annotationData = null;
@@ -362,6 +362,8 @@ function resizeOverlayCanvas() {
 function setupEventListeners() {
     document.getElementById('addCommentBtn').addEventListener('click', function() {
         currentCommentTimestamp = videoPlayer.currentTime;
+        // Pause the video when adding a comment
+        videoPlayer.pause();
         document.getElementById('commentForm').style.display = 'block';
         document.getElementById('commentText').focus();
     });
@@ -521,15 +523,27 @@ function drawCircleOnCanvas(start, end, color) {
 }
 
 function loadComments() {
-    fetch(`/api/video/{{ video.id }}/comments`)
-        .then(response => response.json())
+    fetch(`/api/video/{{ video.id }}/comments/master`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            comments = data;
+            // Ensure data is an array
+            comments = Array.isArray(data) ? data : [];
             updateCommentDots();
             updateCommentsList();
             updateAnnotations();
         })
-        .catch(error => console.error('Error loading comments:', error));
+        .catch(error => {
+            console.error('Error loading comments:', error);
+            comments = []; // Ensure comments is always an array
+            updateCommentDots();
+            updateCommentsList();
+            updateAnnotations();
+        });
 }
 
 function saveComment() {
@@ -549,18 +563,27 @@ function saveComment() {
         commentData.annotation = annotationData;
     }
     
-    fetch(`/api/video/{{ video.id }}/comments`, {
+    fetch(`/api/video/{{ video.id }}/comments/master`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(commentData)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             alert('Error: ' + data.error);
         } else {
+            // Ensure comments is an array before pushing
+            if (!Array.isArray(comments)) {
+                comments = [];
+            }
             comments.push(data);
             updateCommentDots();
             updateCommentsList();
@@ -572,7 +595,7 @@ function saveComment() {
     })
     .catch(error => {
         console.error('Error saving comment:', error);
-        alert('Error saving comment');
+        alert('Error saving comment: ' + error.message);
     });
 }
 
@@ -604,6 +627,12 @@ function deleteComment(commentId) {
 function updateAnnotations() {
     const overlay = document.getElementById('videoOverlay');
     overlay.innerHTML = '';
+    
+    // Ensure comments is an array
+    if (!Array.isArray(comments)) {
+        comments = [];
+        return;
+    }
     
     // Only show annotations for the current timestamp (within 0.5 seconds)
     const currentTime = videoPlayer.currentTime;
@@ -647,6 +676,12 @@ function updateCommentDots() {
     const container = document.getElementById('commentDots');
     container.innerHTML = '';
     
+    // Ensure comments is an array
+    if (!Array.isArray(comments)) {
+        comments = [];
+        return;
+    }
+    
     comments.forEach(comment => {
         const dot = document.createElement('div');
         dot.className = 'comment-dot';
@@ -665,6 +700,11 @@ function updateCommentDots() {
 
 function updateCommentsList() {
     const container = document.getElementById('commentsList');
+    
+    // Ensure comments is an array
+    if (!Array.isArray(comments)) {
+        comments = [];
+    }
     
     if (comments.length === 0) {
         container.innerHTML = '<p class="text-muted">No comments yet. Add comments by pausing the video and clicking "Add Comment".</p>';

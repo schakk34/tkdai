@@ -71,10 +71,55 @@
                     </h5>
                     <p class="card-text">Access your saved videos and rhythms.</p>
                     <a href="{{ url_for('library') }}" class="btn btn-primary">View Library</a>
+                    {% if videos_with_comments %}
+                        <div class="mt-2">
+                            <span class="badge bg-danger">{{ videos_with_comments|length }} videos with comments</span>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- Notifications Section -->
+    {% if videos_with_comments %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell me-2"></i>Instructor Feedback Available
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Your instructor has left comments on the following videos:</p>
+                    <div class="row">
+                        {% for video in videos_with_comments %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ video.title }}</h6>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            {{ video.form_type or 'Recording' }} • {{ video.created_at.strftime('%Y-%m-%d') }}
+                                        </small>
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-danger">{{ video.comments|length }} comments</span>
+                                        <a href="{{ url_for('view_my_video', video_id=video.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-comments me-1"></i>View Comments
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     
     <!-- Calendar and Events Section -->
     <div class="row mt-4">

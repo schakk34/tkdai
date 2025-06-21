@@ -131,6 +131,9 @@ class LibraryItem(db.Model):
     bpm = db.Column(db.Integer)
     markers = db.Column(db.JSON)
     analysis = db.Column(db.JSON)  # For rhythms: store timing markers
+    
+    # Relationship to video comments
+    comments = db.relationship('VideoComment', backref='video', lazy=True)
 
 class Message(db.Model):
     __tablename__ = 'message'

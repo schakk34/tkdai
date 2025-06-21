@@ -48,24 +48,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libswscale-dev \
     libjpeg-dev \
     libpng-dev \
+    libgtk-3-0 \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p static/uploads static/thumbnails
+# Create necessary directories with proper permissions
+RUN mkdir -p static/uploads static/thumbnails && \
+    chmod -R 755 static/uploads static/thumbnails
 
-# Set permissions
-RUN chmod +x app.py
+# Create a non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
 
-# Expose port
+# Switch to non-root user
+USER appuser
+
+# Expose port (match the port in app.py)
 EXPOSE 5002
 
-# Health check
+# Health check (use correct port)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+    CMD curl -f http://localhost:5002/ || exit 1
 
 # Run the application
 CMD ["python", "app.py"] 

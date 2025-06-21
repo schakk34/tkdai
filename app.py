@@ -134,7 +134,8 @@ def signup():
                 email=request.form['email'],
                 password_hash=hashed_password,
                 belt_rank=request.form.get('belt_rank', 'White'),
-                teacher_id=master.id
+                teacher_id=master.id,
+                role=Role.STUDENT  # Explicitly set role as student
             )
             db.session.add(new_user)
             db.session.commit()
@@ -154,7 +155,7 @@ def login():
     print("\n=== Current Users in Database ===")
     all_users = User.query.all()
     for user in all_users:
-        print(f"Username: {user.username}, Email: {user.email}, Is Master: {user.is_master}, Is Admin: {user.is_admin}")
+        print(f"Username: {user.username}, Email: {user.email}, Is Master: {user.is_master()}, Is Admin: {user.is_admin()}")
     print("===============================\n")
 
     # If user is already logged in, redirect to appropriate dashboard
@@ -173,8 +174,8 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user:
-            print(f"User found: {user.username}, is_admin: {user.is_admin}")  # Debug log
-            print(f"User found: {user.username}, is_master: {user.is_master}")  # Debug log
+            print(f"User found: {user.username}, is_admin: {user.is_admin()}")  # Debug log
+            print(f"User found: {user.username}, is_master: {user.is_master()}")  # Debug log
 
             # Verify password
             if check_password_hash(user.password_hash, password):
@@ -403,10 +404,24 @@ def dashboard():
         (CustomEvent.target_students.contains([current_user.id]))
     ).order_by(CustomEvent.event_date).all()
 
+    # Get videos with comments for notifications
+    videos_with_comments = []
+    user_videos = LibraryItem.query.filter_by(
+        user_id=current_user.id,
+        item_type='video'
+    ).all()
+    
+    for video in user_videos:
+        comments = VideoComment.query.filter_by(video_id=video.id).all()
+        if comments:
+            video.comments = comments
+            videos_with_comments.append(video)
+
     return render_template('dashboard.html',
                          user=current_user,
                          wt_events=wt_events,
-                         custom_events=custom_events)
+                         custom_events=custom_events,
+                         videos_with_comments=videos_with_comments)
 
 @app.route('/practice')
 @login_required
@@ -669,6 +684,14 @@ def process_form_comparison():
             rhythm_path = os.path.join(user_upload_dir, rhythm_filename)
             rhythm_file.save(rhythm_path)
 
+        # If this is a recording (not a form comparison), just return the converted video
+        if form_type == 'recording':
+            return jsonify({
+                'success': True,
+                'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
+                'mp4_path': mp4_path
+            })
+
         # Check if ideal data exists for this form
         # Map form types to their actual file names
         form_type_map = {
@@ -736,7 +759,8 @@ def process_form_comparison():
             'score': score_percentage,
             'stars_earned': stars_earned,
             'total_stars': current_user.star_count,
-            'all_feature_vectors': feature_vectors
+            'all_feature_vectors': feature_vectors,
+            'mp4_path': result_video_path  # Use the comparison video path here
         })
 
     except Exception as e:
@@ -776,6 +800,10 @@ def library():
         item_type='video'
     ).order_by(LibraryItem.created_at.desc()).all()
 
+    # Add comments to each video
+    for video in videos:
+        video.comments = VideoComment.query.filter_by(video_id=video.id).all()
+
     rhythms = LibraryItem.query.filter_by(
         user_id=current_user.id,
         item_type='rhythm'
@@ -788,6 +816,8 @@ def library():
 def save_to_library():
     try:
         data = request.json
+        print(f"Received data: {data}")  # Debug: print the entire request data
+        
         item_type = data.get('type')
         title = data.get('title')
         description = data.get('description', '')
@@ -796,18 +826,32 @@ def save_to_library():
         print(f"Saving to library - Type: {item_type}, Title: {title}, File: {file_path}")  # Debug log
 
         if not all([item_type, title]):
+            print(f"Missing required fields - item_type: {item_type}, title: {title}")  # Debug
             return jsonify({'success': False, 'error': 'Missing required fields'})
 
         # Convert the file path to a URL
         if file_path.startswith('blob:') or file_path.startswith('http'):
             # Handle blob URLs (from recordings)
+            print(f"Using blob/http URL: {file_path}")  # Debug
             file_path = file_path
         else:
-            # Convert relative path to URL
-            relative_path = os.path.relpath(file_path, app.config['UPLOAD_FOLDER'])
+            # Handle full paths from mp4_path
+            print(f"Processing file path: {file_path}")  # Debug
+            if os.path.isabs(file_path):
+                # It's an absolute path, get the relative path from uploads folder
+                print(f"File path is absolute: {file_path}")  # Debug
+                relative_path = os.path.relpath(file_path, app.config['UPLOAD_FOLDER'])
+                print(f"Relative path: {relative_path}")  # Debug
+            else:
+                # It's already a relative path
+                print(f"File path is relative: {file_path}")  # Debug
+                relative_path = file_path
+            
             file_path = url_for('serve_upload', filename=relative_path, _external=True)
             print(f"Converted file path to URL: {file_path}")  # Debug log
+
         # Create new library item
+        print(f"Creating LibraryItem with file_path: {file_path}")  # Debug
         item = LibraryItem(
             user_id=current_user.id,
             item_type=item_type,
@@ -819,16 +863,22 @@ def save_to_library():
         # Add type-specific data
         if item_type == 'video':
             item.form_type = data.get('form_type')
+            print(f"Added form_type: {item.form_type}")  # Debug
         elif item_type == 'rhythm':
             item.markers = data.get('markers')
+            print(f"Added markers: {item.markers}")  # Debug
 
+        print(f"About to add item to database")  # Debug
         db.session.add(item)
+        print(f"About to commit to database")  # Debug
         db.session.commit()
 
         print(f"Successfully saved item to library with ID: {item.id}")  # Debug log
         return jsonify({'success': True, 'id': item.id})
     except Exception as e:
+        import traceback
         print(f"Error saving to library: {str(e)}")  # Debug log
+        print(f"Full traceback: {traceback.format_exc()}")  # Debug: print full traceback
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/library/delete/<int:item_id>', methods=['DELETE'])
@@ -958,7 +1008,7 @@ def master_required(f):
 def master_dashboard():
     # Get all master's students
     students = User.query.filter_by(
-        class_code=current_user.class_code,
+        teacher_id=current_user.id,
         role=Role.STUDENT
     ).all()
     return render_template('master/dashboard.html', students=students)
@@ -968,7 +1018,7 @@ def master_dashboard():
 @master_required
 def master_users():
     students = User.query.filter_by(
-        class_code=current_user.class_code,
+        teacher_id=current_user.id,
         role=Role.STUDENT
     ).all()
     return render_template('master/users.html', students=students)
@@ -978,7 +1028,7 @@ def master_users():
 @master_required
 def master_user_detail(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot view master user details.')
         return redirect(url_for('master_users'))
 
@@ -995,7 +1045,7 @@ def master_user_detail(user_id):
 @master_required
 def master_user_progress(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot view master user progress.')
         return redirect(url_for('master_users'))
     progress_data = Progress.query.filter_by(user_id=user.id).all()
@@ -1006,7 +1056,7 @@ def master_user_progress(user_id):
 @master_required
 def master_update_belt(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot modify master user.')
         return redirect(url_for('master_users'))
 
@@ -1025,7 +1075,7 @@ def master_update_belt(user_id):
 @master_required
 def master_send_message(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot send message to master user.')
         return redirect(url_for('master_users'))
 
@@ -1052,7 +1102,7 @@ def master_send_message(user_id):
 @master_required
 def master_download_csv(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot download master data.')
         return redirect(url_for('master_users'))
 
@@ -1084,59 +1134,20 @@ def master_download_csv(user_id):
         }
     )
 
-# Add route to create first master user
-# @app.route('/create-master', methods=['GET', 'POST'])
-# def create_master(): # COME BACK TO
-#     # Check if any master exists
-#     if User.query.filter_by(is_master=True).first():
-#         flash('Admin user already exists.')
-#         return redirect(url_for('login'))
-#
-#     if request.method == 'POST':
-#         username = request.form.get('username')
-#         email = request.form.get('email')
-#         password = request.form.get('password')
-#
-#         print(f"Attempting to create master account for username: {username}")  # Debug log
-#
-#         if User.query.filter_by(username=username).first():
-#             print(f"Username {username} already exists")  # Debug log
-#             flash('Username already exists.')
-#             return render_template('create_admin.html')
-#
-#         if User.query.filter_by(email=email).first():
-#             print(f"Email {email} already registered")  # Debug log
-#             flash('Email already registered.')
-#             return render_template('create_admin.html')
-#
-#         try:
-#             # Create master user first
-#             admin_user = User(
-#                 username=username,
-#                 email=email,
-#                 password_hash=generate_password_hash(password),
-#                 is_admin=True,
-#                 created_at=datetime.now()
-#             )
-#
-#             # Generate and set class code
-#             class_code = admin_user.generate_class_code()
-#             print(f"Generated class code: {class_code}")  # Debug log
-#
-#             # Add to session and commit
-#             db.session.add(admin_user)
-#             db.session.commit()
-#
-#             print(f"Successfully created master account for {username} with class code {class_code}")  # Debug log
-#             flash('Admin account created successfully! Please log in.')
-#             return redirect(url_for('login'))
-#         except Exception as e:
-#             print(f"Error creating master account: {str(e)}")  # Debug log
-#             db.session.rollback()
-#             flash('An error occurred while creating the master account.')
-#             return render_template('create_admin.html')
-#
-#     return render_template('create_admin.html')
+@app.route('/master/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+@master_required
+def master_delete_student(user_id):
+    user = User.query.get_or_404(user_id)
+    # Only allow deleting students in this master's school
+    if user.role != Role.STUDENT or user.teacher_id != current_user.id:
+        flash('You can only delete your own students.')
+        return redirect(url_for('master_users'))
+    # Optionally: delete related data (progress, library, etc.)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Student {user.username} has been deleted.')
+    return redirect(url_for('master_users'))
 
 @app.route('/messages')
 @login_required
@@ -1201,25 +1212,25 @@ def inject_unread_messages():
 @master_required
 def master_messages(user_id=None):
     # Debug: Print current user info
-    print(f"Current user: {current_user.username}, is_master: {current_user.is_master}")
+    print(f"Current user: {current_user.username}, is_master: {current_user.is_master()}")
 
     # Get all non-master users
     students = User.query.filter_by(
         role=Role.STUDENT,
-        class_code=current_user.class_code
+        teacher_id=current_user.id
     ).order_by(User.username).all()
     print(f"Found {len(students)} non-master users")
     for student in students:
-        print(f"User: {student.username}, is_master: {student.is_master}")
+        print(f"User: {student.username}, is_master: {student.is_master()}")
 
     selected_user = None
     messages = []
 
     if user_id:
         selected_user = User.query.get_or_404(user_id)
-        print(f"Selected user: {selected_user.username}, is_master: {selected_user.is_master}")
+        print(f"Selected user: {selected_user.username}, is_master: {selected_user.is_master()}")
 
-        if selected_user.is_master:
+        if selected_user.is_master():
             flash('Cannot view master user messages.')
             return redirect(url_for('master_messages'))
 
@@ -1253,7 +1264,7 @@ def master_send_announcement():
     # Get master's students
     students = User.query.filter_by(
         role=Role.STUDENT,
-        class_code=current_user.class_code
+        teacher_id=current_user.id
     ).order_by(User.username).all()
 
     # Create a message for each student
@@ -1274,7 +1285,7 @@ def master_send_announcement():
 @master_required
 def master_view_student_video(user_id, video_id):
     user = User.query.get_or_404(user_id)
-    if user.is_master:
+    if user.is_master():
         flash('Cannot view master user videos.')
         return redirect(url_for('master_users'))
     
@@ -1293,9 +1304,13 @@ def master_view_student_video(user_id, video_id):
 
 @app.route('/api/video/<int:video_id>/comments', methods=['GET'])
 @login_required
-@master_required
-def get_video_comments(video_id):
-    """Get all comments for a video"""
+def get_video_comments_student(video_id):
+    """Get all comments for a video (student access)"""
+    # Verify the video belongs to the current user
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
     comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
     return jsonify([{
         'id': comment.id,
@@ -1312,11 +1327,37 @@ def get_video_comments(video_id):
         } if comment.has_annotation else None
     } for comment in comments])
 
-@app.route('/api/video/<int:video_id>/comments', methods=['POST'])
+@app.route('/api/video/<int:video_id>/comments/master', methods=['GET'])
 @login_required
 @master_required
-def add_video_comment(video_id):
-    """Add a new comment to a video"""
+def get_video_comments(video_id):
+    """Get all comments for a video (master access)"""
+    # Verify the video belongs to the current user
+    video = LibraryItem.query.get_or_404(video_id)
+    if video.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    return jsonify([{
+        'id': comment.id,
+        'timestamp': comment.timestamp,
+        'comment': comment.comment,
+        'created_at': comment.created_at.isoformat(),
+        'master_name': comment.master.username,
+        'has_annotation': comment.has_annotation,
+        'annotation': {
+            'x': comment.annotation_x,
+            'y': comment.annotation_y,
+            'radius': comment.annotation_radius,
+            'color': comment.annotation_color
+        } if comment.has_annotation else None
+    } for comment in comments])
+
+@app.route('/api/video/<int:video_id>/comments/master', methods=['POST'])
+@login_required
+@master_required
+def add_video_comment_master(video_id):
+    """Add a new comment to a video (master access)"""
     data = request.get_json()
     timestamp = data.get('timestamp')
     comment_text = data.get('comment')
@@ -1331,7 +1372,7 @@ def add_video_comment(video_id):
         return jsonify({'error': 'Item is not a video'}), 400
     
     student = User.query.get(video.user_id)
-    if student.is_master:
+    if student.is_master():
         return jsonify({'error': 'Cannot comment on master videos'}), 400
     
     # Create the comment
@@ -1393,7 +1434,10 @@ def view_my_video(video_id):
         flash('You can only view your own videos.')
         return redirect(url_for('library'))
     
-    return render_template('view_my_video.html', video=video)
+    # Get comments for this video
+    comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
+    
+    return render_template('view_my_video.html', video=video, comments=comments)
 
 # Calendar Management Routes
 @app.route('/master/calendar')
@@ -1403,7 +1447,7 @@ def master_calendar():
     """master calendar management page"""
     events = CustomEvent.query.order_by(CustomEvent.event_date).all()
     students = User.query.filter_by(
-        class_code=current_user.class_code,
+        teacher_id=current_user.id,
         role=Role.STUDENT
     ).order_by(User.username).all()
     return render_template('master/calendar.html', events=events, students=students)

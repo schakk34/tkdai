@@ -282,7 +282,7 @@
                                     {% if comment.has_annotation %}
                                         <span class="annotation-indicator" style="background-color: {{ comment.annotation_color }};"></span>
                                     {% endif %}
-                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.admin.username }}
+                                    {{ "%.1f"|format(comment.timestamp) }}s - {{ comment.master.username }}
                                 </div>
                                 <div class="comment-text">{{ comment.comment }}</div>
                                 <div class="comment-actions">
@@ -362,6 +362,8 @@ function resizeOverlayCanvas() {
 function setupEventListeners() {
     document.getElementById('addCommentBtn').addEventListener('click', function() {
         currentCommentTimestamp = videoPlayer.currentTime;
+        // Pause the video when adding a comment
+        videoPlayer.pause();
         document.getElementById('commentForm').style.display = 'block';
         document.getElementById('commentText').focus();
     });
@@ -521,7 +523,7 @@ function drawCircleOnCanvas(start, end, color) {
 }
 
 function loadComments() {
-    fetch(`/api/video/{{ video.id }}/comments`)
+    fetch(`/api/video/{{ video.id }}/comments/master`)
         .then(response => response.json())
         .then(data => {
             comments = data;
@@ -549,14 +551,19 @@ function saveComment() {
         commentData.annotation = annotationData;
     }
     
-    fetch(`/api/video/{{ video.id }}/comments`, {
+    fetch(`/api/video/{{ video.id }}/comments/master`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(commentData)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
             alert('Error: ' + data.error);
@@ -572,7 +579,7 @@ function saveComment() {
     })
     .catch(error => {
         console.error('Error saving comment:', error);
-        alert('Error saving comment');
+        alert('Error saving comment: ' + error.message);
     });
 }
 
