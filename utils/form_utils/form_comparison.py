@@ -260,7 +260,7 @@ class FormComparison:
             DOWNSAMPLE = (width, height)
             FRAME_SKIP = 2
 
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             temp_out = str(output_path) + ".novid.mp4"
             out = cv2.VideoWriter(temp_out, fourcc, fps / (FRAME_SKIP + 1), DOWNSAMPLE)
 
@@ -360,37 +360,39 @@ class FormComparison:
             cap.release()
             out.release()
 
-            temp_vid_path = output_path + ".novid.mp4"
-            final_vid_path = output_path
-
             print(f"✅ Wrote raw video frames to {temp_out}")
 
+            # ─────────────── FFmpeg Re-encode Pass ───────────────
+            # Re-encode into H.264 (and AAC if we have audio), disable stdin
+            final_vid = str(output_path)
+            cmd = ['ffmpeg', '-y', '-nostdin', '-i', temp_out]
 
-            
-            # Add audio if provided
-            if audio_path:
-                audio_file = Path(audio_path)
-                if audio_file.exists():
-                    final = str(output_path)
-                    cmd = [
-                        'ffmpeg', '-y',
-                        '-i', temp_out,
-                        '-i', str(audio_file),
-                        '-c:v', 'copy',
-                        '-c:a', 'aac',
-                        '-b:a', '128k',
-                        '-shortest',
-                        final
-                    ]
-                    subprocess.run(cmd, check=True)
-                    os.remove(temp_out)
-                    print(f"✅ Final video with audio at {final}")
-                    return final, all_feature_vectors
+            if audio_path and Path(audio_path).exists():
+                cmd += ['-i', str(audio_path),
+                        '-map', '0:v', '-map', '1:a',
+                        '-c:a', 'aac', '-b:a', '128k']
+            else:
+                # no audio → drop it entirely
+                cmd += ['-map', '0:v', '-an']
 
-            print(f"✅ Comparison video saved to {output_path}")
+            cmd += [
+                '-c:v', 'libx264',      # re-encode video to H.264
+                '-preset', 'fast',      # tune: ultrafast, superfast, fast, etc.
+                '-crf', '23',           # quality: lower ⇒ better. 18–28 is a decent range.
+                '-c:a', 'aac',          # re-encode audio to AAC
+                '-b:a', '128k',         # audio bitrate
+                '-shortest',            # stop at the end of the shorter stream
+                final_vid
+            ]
 
-            os.rename(temp_out, str(output_path))
-            return str(output_path), all_feature_vectors
+            print(f"Re-encoding with FFmpeg:\n    {' '.join(cmd)}")
+            subprocess.run(cmd, check=True)
+
+            # clean up the intermediate
+            os.remove(temp_out)
+            print(f"✅ Final H.264/AAC video at {final_vid}")
+
+            return final_vid, all_feature_vectors
 
         except Exception as e:
             print(f"Error processing video: {str(e)}")
