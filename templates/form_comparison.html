@@ -247,6 +247,7 @@ let countdownTimeout;
 let idealFrameCount = 0;
 let referenceVideo = null;
 let currentFormType = 'koryo'; // Default form type
+let lastMp4Path = null; // Store the mp4_path for library saves
 
 async function loadIdealData(formType) {
     try {
@@ -460,6 +461,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             const resultVideo = document.getElementById('resultVideo');
             resultVideo.src = data.video_url;
             savedVectors = data.all_feature_vectors;
+            lastMp4Path = data.mp4_path; // Store the mp4_path
             document.getElementById('results').style.display = 'block';
             document.getElementById('downloadResult').href = data.video_url;
             document.getElementById('downloadResult').download = 'form-comparison.mp4';
@@ -499,6 +501,8 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             } else {
                 scoreElement.className = 'badge bg-danger';
             }
+
+            // Note: Users can manually save to library using the "Save to Library" button
         } else {
             alert(data.error || 'Failed to process video');
         }
@@ -561,6 +565,11 @@ document.getElementById('saveToLibrary').addEventListener('click', async () => {
         return;
     }
     
+    if (!lastMp4Path) {
+        alert('No video data available. Please complete the form comparison first.');
+        return;
+    }
+    
     const title = prompt('Enter a title for this video:', `${formType.charAt(0).toUpperCase() + formType.slice(1)} Form - ${new Date().toLocaleDateString()}`);
     if (!title) return;
     
@@ -576,7 +585,7 @@ document.getElementById('saveToLibrary').addEventListener('click', async () => {
                 type: 'video',
                 title: title,
                 description: description,
-                file_path: videoUrl,
+                file_path: lastMp4Path,
                 form_type: formType
             })
         });
@@ -609,31 +618,68 @@ document.getElementById('saveRecordingToLibrary').addEventListener('click', asyn
     
     const description = prompt('Enter a description (optional):', '');
     
+    // Convert the blob to a file and upload it for conversion
     try {
-        const response = await fetch('/library/save', {
+        // Get the blob from the recorded chunks
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        
+        // Create a FormData to upload the recording
+        const formData = new FormData();
+        formData.append('video', blob, 'recording.webm');
+        formData.append('formType', 'recording'); // Use a dummy form type for conversion
+        
+        // Show loading state
+        const button = document.getElementById('saveRecordingToLibrary');
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Converting...';
+        
+        // Upload for conversion
+        const response = await fetch('/process-form-comparison', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                type: 'video',
-                title: title,
-                description: description,
-                file_path: videoUrl,
-                form_type: 'recording'  // Mark as a recording rather than a comparison
-            })
+            body: formData
         });
+        
+        if (!response.ok) {
+            throw new Error('Failed to convert video');
+        }
         
         const data = await response.json();
         
         if (data.success) {
-            alert('Video saved to library successfully!');
+            // Now save the converted mp4 to library
+            const saveResponse = await fetch('/library/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    type: 'video',
+                    title: title,
+                    description: description,
+                    file_path: data.mp4_path,
+                    form_type: 'recording'
+                })
+            });
+            
+            const saveData = await saveResponse.json();
+            
+            if (saveData.success) {
+                alert('Video saved to library successfully!');
+            } else {
+                alert(saveData.error || 'Failed to save video to library');
+            }
         } else {
-            alert(data.error || 'Failed to save video to library');
+            alert(data.error || 'Failed to convert video');
         }
     } catch (error) {
         console.error('Error:', error);
         alert('An error occurred while saving to library');
+    } finally {
+        // Restore button state
+        const button = document.getElementById('saveRecordingToLibrary');
+        button.disabled = false;
+        button.innerHTML = originalText;
     }
 });
 

@@ -23,10 +23,11 @@ from models import db, LibraryItem, User, Progress, UserActivity, Message, Video
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
+# Use absolute path for uploads
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tkdai.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024  # 256MB max file size
 
 # Initialize database
@@ -36,6 +37,8 @@ db.init_app(app)
 with app.app_context():
     # Only create tables if they don't exist
     db.create_all()
+    # Ensure upload folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -598,6 +601,7 @@ def process_form_comparison():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         video_filename = f"{form_type}_{timestamp}.webm"
         video_path = os.path.join(user_upload_dir, video_filename)
+        print(f"Saving video to: {os.path.abspath(video_path)}")  # Debug log
         video_file.save(video_path)
 
         # Convert webm to mp4
@@ -617,6 +621,14 @@ def process_form_comparison():
             rhythm_filename = f"{form_type}_rhythm_{timestamp}.mp3"
             rhythm_path = os.path.join(user_upload_dir, rhythm_filename)
             rhythm_file.save(rhythm_path)
+
+        # If this is a recording (not a form comparison), just return the converted video
+        if form_type == 'recording':
+            return jsonify({
+                'success': True,
+                'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
+                'mp4_path': mp4_path
+            })
 
         # Check if ideal data exists for this form
         # Map form types to their actual file names
@@ -685,7 +697,8 @@ def process_form_comparison():
             'score': score_percentage,
             'stars_earned': stars_earned,
             'total_stars': current_user.star_count,
-            'all_feature_vectors': feature_vectors
+            'all_feature_vectors': feature_vectors,
+            'mp4_path': mp4_path  # Add the mp4 path to the response
         })
 
     except Exception as e:
@@ -737,6 +750,8 @@ def library():
 def save_to_library():
     try:
         data = request.json
+        print(f"Received data: {data}")  # Debug: print the entire request data
+        
         item_type = data.get('type')
         title = data.get('title')
         description = data.get('description', '')
@@ -745,18 +760,32 @@ def save_to_library():
         print(f"Saving to library - Type: {item_type}, Title: {title}, File: {file_path}")  # Debug log
 
         if not all([item_type, title]):
+            print(f"Missing required fields - item_type: {item_type}, title: {title}")  # Debug
             return jsonify({'success': False, 'error': 'Missing required fields'})
 
         # Convert the file path to a URL
         if file_path.startswith('blob:') or file_path.startswith('http'):
             # Handle blob URLs (from recordings)
+            print(f"Using blob/http URL: {file_path}")  # Debug
             file_path = file_path
         else:
-            # Convert relative path to URL
-            filename = os.path.basename(file_path)
-            file_path = url_for('serve_upload', filename=filename, _external=True)
+            # Handle full paths from mp4_path
+            print(f"Processing file path: {file_path}")  # Debug
+            if os.path.isabs(file_path):
+                # It's an absolute path, get the relative path from uploads folder
+                print(f"File path is absolute: {file_path}")  # Debug
+                relative_path = os.path.relpath(file_path, app.config['UPLOAD_FOLDER'])
+                print(f"Relative path: {relative_path}")  # Debug
+            else:
+                # It's already a relative path
+                print(f"File path is relative: {file_path}")  # Debug
+                relative_path = file_path
+            
+            file_path = url_for('serve_upload', filename=relative_path, _external=True)
             print(f"Converted file path to URL: {file_path}")  # Debug log
+
         # Create new library item
+        print(f"Creating LibraryItem with file_path: {file_path}")  # Debug
         item = LibraryItem(
             user_id=current_user.id,
             item_type=item_type,
@@ -768,16 +797,22 @@ def save_to_library():
         # Add type-specific data
         if item_type == 'video':
             item.form_type = data.get('form_type')
+            print(f"Added form_type: {item.form_type}")  # Debug
         elif item_type == 'rhythm':
             item.markers = data.get('markers')
+            print(f"Added markers: {item.markers}")  # Debug
 
+        print(f"About to add item to database")  # Debug
         db.session.add(item)
+        print(f"About to commit to database")  # Debug
         db.session.commit()
 
         print(f"Successfully saved item to library with ID: {item.id}")  # Debug log
         return jsonify({'success': True, 'id': item.id})
     except Exception as e:
+        import traceback
         print(f"Error saving to library: {str(e)}")  # Debug log
+        print(f"Full traceback: {traceback.format_exc()}")  # Debug: print full traceback
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/library/delete/<int:item_id>', methods=['DELETE'])
@@ -1516,7 +1551,7 @@ def toggle_video_favorite(video_id):
             'error': str(e)
         }), 500
 
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True, port=5002)
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 5002))
+    app.run(host="0.0.0.0", port=port)
