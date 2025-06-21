@@ -750,13 +750,54 @@ def process_form_comparison():
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type}'}), 400
 
-        # Process the video
-        form_comparison = FormComparison(ideal_data_path=ideal_data_path)
-        result_video_path, feature_vectors = form_comparison.process_user_video(
-            user_video_path=mp4_path,
-            output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),
-            audio_path=rhythm_path
-        )
+        # Process the video with timeout
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Form comparison timed out")
+        
+        # Set timeout for form comparison (3 minutes)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(180)  # 3 minutes timeout
+        
+        try:
+            form_comparison = FormComparison(ideal_data_path=ideal_data_path)
+            
+            # Add timeout and memory optimization for form comparison
+            try:
+                result_video_path, feature_vectors = form_comparison.process_user_video(
+                    user_video_path=mp4_path,
+                    output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),
+                    audio_path=rhythm_path
+                )
+            except Exception as e:
+                print(f"Form comparison processing error: {e}")
+                # Return a basic response if form comparison fails
+                return jsonify({
+                    'success': True,
+                    'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
+                    'score': 0.0,
+                    'stars_earned': 1,
+                    'total_stars': current_user.star_count,
+                    'all_feature_vectors': [],
+                    'mp4_path': mp4_path,
+                    'message': 'Video processed but form comparison failed. You can still save to library.'
+                })
+        except TimeoutError:
+            print("Form comparison timed out")
+            signal.alarm(0)  # Cancel the alarm
+            return jsonify({
+                'success': True,
+                'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
+                'score': 0.0,
+                'stars_earned': 1,
+                'total_stars': current_user.star_count,
+                'all_feature_vectors': [],
+                'mp4_path': mp4_path,
+                'message': 'Video processed but form comparison timed out. You can still save to library.'
+            })
+        finally:
+            signal.alarm(0)  # Cancel the alarm
 
         # Calculate average score and convert to percentage
         if not feature_vectors:
