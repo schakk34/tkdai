@@ -1,24 +1,40 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Enum as SAEnum
 from datetime import datetime
+import enum
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+class Role(enum.Enum):
+    STUDENT = 'student'
+    ASSISTANT = 'assistant'
+    MASTER = 'master'
+    ADMIN = 'admin'
+
 # Update User model to work with Flask-Login
 class User(UserMixin, db.Model):
+    __tablename__ = 'user'
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(128), nullable=False)
     belt_rank = db.Column(db.String(20), default='White')
-    is_admin = db.Column(db.Boolean, default=False)
-    class_code = db.Column(db.String(10), unique=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    role = db.Column(
+        SAEnum(Role, name="role_enum", native_enum=False),
+        default=Role.STUDENT,
+        nullable=False
+    )
+    class_code = db.Column(db.String(10), unique=True, nullable=True) # FOR MASTERS ONLYYYYYYYY
+    teacher_id = db.Column(db.Integer, db.ForeignKey('user.id'))      # FOR STUDENTS ONLY
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     star_count = db.Column(db.Integer, default=0)
-    
+
     # Relationships
+    teacher = db.relationship('User', remote_side=[id], backref='students')
     progress = db.relationship('Progress', backref='user', lazy=True)
     library_items = db.relationship('LibraryItem', backref='user', lazy=True)
     activities = db.relationship('UserActivity', backref='user', lazy=True)
@@ -28,11 +44,22 @@ class User(UserMixin, db.Model):
                            primaryjoin="and_(User.id==LibraryItem.user_id, LibraryItem.item_type=='video')",
                            lazy=True)
     rhythms = db.relationship('LibraryItem',
-                            primaryjoin="and_(User.id==LibraryItem.user_id, LibraryItem.item_type=='metronome')",
+                            primaryjoin="and_(User.id==LibraryItem.user_id, LibraryItem.item_type=='rhythm')",
                             lazy=True)
-    
-    # Remove duplicate relationship definitions
-    # sent_messages and received_messages are defined in the Message model
+
+    sent_messages = db.relationship('Message', foreign_keys='Message.sender_id', backref='sender', lazy=True)
+    received_messages = db.relationship('Message', foreign_keys='Message.receiver_id', backref='receiver', lazy=True)
+    video_comments = db.relationship('VideoComment', backref='master', lazy=True)
+    created_events = db.relationship('CustomEvent', backref='creator', lazy=True)
+
+    def is_student(self):
+        return self.role == Role.STUDENT
+
+    def is_master(self):
+        return self.role == Role.MASTER
+
+    def is_admin(self):
+        return self.role == Role.ADMIN
 
     def is_authenticated(self):
         return True
@@ -46,83 +73,88 @@ class User(UserMixin, db.Model):
     def get_id(self):
         return str(self.id)
 
-    def is_administrator(self):
-        return self.is_admin
-
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
+    def set_role(self, role: str):
+        if role not in ['student', 'assistant', 'master', 'admin']:
+            print("unknown role, defaulting to student")
+            role = Role.STUDENT
+        else:
+            if role == 'student':
+                self.role = Role.STUDENT
+            elif role == 'assistant':
+                self.role = Role.ASSISTANT
+            elif role == 'master':
+                self.role = Role.MASTER
+            else:
+                self.role = Role.ADMIN
         
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    def generate_class_code(self):
-        """Generate a fixed class code"""
-        code = "WHITE-TIGER"
-        print(f"Generated code: {code}")  # Debug log
-        
-        # Set the class code
-        self.class_code = code
-        print(f"Set class code to: {self.class_code}")  # Debug log
-        
-        return code
 
-
-# Progress tracking model
 class Progress(db.Model):
+    __tablename__ = 'progress'
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     technique = db.Column(db.String(50), nullable=False)
     score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.DateTime, nullable=False)
+    date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
-# Add this after the Progress model
 class UserActivity(db.Model):
+    __tablename__ = 'user_activity'
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     activity_date = db.Column(db.Date, nullable=False)
     activity_type = db.Column(db.String(50), nullable=False, default='login')
-    details = db.Column(db.Text)  # Add details field for messages and other information
+    details = db.Column(db.Text)
 
     __table_args__ = (
         db.UniqueConstraint('user_id', 'activity_date', 'activity_type', name='unique_user_activity'),
     )
 
 class LibraryItem(db.Model):
+    __tablename__ = 'library_item'
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    item_type = db.Column(db.String(20), nullable=False)  # 'video' or 'metronome'
+    item_type = db.Column(db.String(20), nullable=False)  # 'video' or 'rhythm'
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     file_path = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    form_type = db.Column(db.String(50))  # For videos: 'koryo', 'keumgang', etc.
-    bpm = db.Column(db.Integer)  # For metronomes
-    markers = db.Column(db.JSON)  # For metronomes: store timing markers
+    form_type = db.Column(db.String(50))  # e.g. 'koryo'
+    bpm = db.Column(db.Integer)
+    markers = db.Column(db.JSON)
+    analysis = db.Column(db.JSON)  # For rhythms: store timing markers
 
 class Message(db.Model):
+    __tablename__ = 'message'
+
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
-
-    # Relationships with backrefs
-    sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('sent_messages', lazy=True))
-    receiver = db.relationship('User', foreign_keys=[receiver_id], backref=db.backref('received_messages', lazy=True))
 
     def __repr__(self):
         return f'<Message {self.id}>'
 
 
 class VideoComment(db.Model):
+    __tablename__ = 'video_comment'
+
     id = db.Column(db.Integer, primary_key=True)
     video_id = db.Column(db.Integer, db.ForeignKey('library_item.id'), nullable=False)
-    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    timestamp = db.Column(db.Float, nullable=False)  # Time in seconds
+    master_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    timestamp = db.Column(db.Float, nullable=False)
     comment = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Annotation fields
     has_annotation = db.Column(db.Boolean, default=False)  # Whether this comment has a visual annotation
@@ -131,30 +163,25 @@ class VideoComment(db.Model):
     annotation_radius = db.Column(db.Float, default=5.0)  # Radius of circle (percentage of video width)
     annotation_color = db.Column(db.String(7), default='#ff0000')  # Color of circle (hex)
     
-    # Relationships
-    video = db.relationship('LibraryItem', backref=db.backref('comments', lazy=True))
-    admin = db.relationship('User', backref=db.backref('video_comments', lazy=True))
-    
     def __repr__(self):
         return f'<VideoComment {self.id}>'
 
 
 class CustomEvent(db.Model):
+    __tablename__ = 'custom_event'
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     event_date = db.Column(db.Date, nullable=False)
-    event_time = db.Column(db.Time)  # Optional time
+    event_time = db.Column(db.Time)
     location = db.Column(db.String(200))
-    event_type = db.Column(db.String(50), default='general')  # 'class', 'competition', 'seminar', etc.
+    event_type = db.Column(db.String(50), default='general')
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_all_day = db.Column(db.Boolean, default=True)
-    send_to_all = db.Column(db.Boolean, default=True)  # Send to all students
-    target_students = db.Column(db.JSON)  # List of student IDs for targeted events
-    
-    # Relationships
-    creator = db.relationship('User', backref=db.backref('created_events', lazy=True))
+    send_to_all = db.Column(db.Boolean, default=True)
+    target_students = db.Column(db.JSON)
     
     def __repr__(self):
         return f'<CustomEvent {self.title}>'

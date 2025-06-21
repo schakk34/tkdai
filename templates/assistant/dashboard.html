@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - TKD AI{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Admin Dashboard</h1>
+        </div>
+    </div>
+
+    <!-- Class Code Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Your Class Code</h5>
+                    <p class="card-text">Share this code with your students to allow them to create accounts:</p>
+                    <div class="d-flex align-items-center">
+                        <h3 class="mb-0 me-3">{{ current_user.class_code }}</h3>
+                        <button class="btn btn-outline-primary" onclick="copyClassCode()">
+                            <i class="fas fa-copy me-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Students</h5>
+                    <p class="card-text display-4">{{ students|length }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Active Today</h5>
+                    <p class="card-text display-4">{{ students|selectattr('last_login', 'defined')|list|length }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">New This Week</h5>
+                    <p class="card-text display-4">{{ students|selectattr('created_at', 'defined')|list|length }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Calendar Events</h5>
+                    <p class="card-text display-4">{{ current_user.created_events|length }}</p>
+                    <a href="{{ url_for('master_calendar') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-calendar-plus me-1"></i>Manage Events
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Star Leaderboard -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="card-title mb-0">Star Leaderboard</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Student</th>
+                                    <th>Belt Rank</th>
+                                    <th>Stars Earned</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students|sort(attribute='star_count', reverse=true) %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                            <i class="fas fa-trophy text-warning"></i>
+                                        {% elif loop.index == 2 %}
+                                            <i class="fas fa-trophy text-secondary"></i>
+                                        {% elif loop.index == 3 %}
+                                            <i class="fas fa-trophy text-danger"></i>
+                                        {% else %}
+                                            {{ loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ student.username }}</td>
+                                    <td>{{ student.belt_rank }}</td>
+                                    <td>
+                                        <i class="fas fa-star text-warning"></i>
+                                        {{ student.star_count }}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('master_user_detail', user_id=student.id) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-user"></i> Details
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Libraries -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: var(--primary-color); color: white;">
+                    <h5 class="card-title mb-0">Student Libraries</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Videos</th>
+                                    <th>Rhythms</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ student.username }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ student.videos|length }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ student.rhythms|length }}</span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#libraryModal{{ student.id }}">
+                                            <i class="fas fa-folder-open"></i> View Library
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Student Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in students %}
+                                <tr>
+                                    <td>{{ student.username }}</td>
+                                    <td>{{ student.last_login.strftime('%Y-%m-%d %H:%M') if student.last_login else 'Never' }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('master_user_detail', user_id=student.id) }}" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-user"></i> Details
+                                            </a>
+                                            <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#messageModal{{ student.id }}">
+                                                <i class="fas fa-envelope"></i> Message
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Message Modals -->
+{% for student in students %}
+<div class="modal fade" id="messageModal{{ student.id }}" tabindex="-1" aria-labelledby="messageModalLabel{{ student.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageModalLabel{{ student.id }}">Send Message to {{ student.username }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('master_send_message', user_id=student.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="message{{ student.id }}" class="form-label">Message</label>
+                        <textarea class="form-control" id="message{{ student.id }}" name="message" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Library Modals -->
+{% for student in students %}
+<div class="modal fade" id="libraryModal{{ student.id }}" tabindex="-1" aria-labelledby="libraryModalLabel{{ student.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="libraryModalLabel{{ student.id }}">{{ student.username }}'s Library</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="videos-tab-{{ student.id }}" data-bs-toggle="tab" data-bs-target="#videos-{{ student.id }}" type="button" role="tab" style="color: #dc3545;">
+                            <i class="fas fa-video me-2"></i>Videos ({{ student.videos|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="rhythms-tab-{{ student.id }}" data-bs-toggle="tab" data-bs-target="#rhythms-{{ student.id }}" type="button" role="tab" style="color: #dc3545;">
+                            <i class="fas fa-music me-2"></i>Rhythms ({{ student.rhythms|length }})
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Videos Tab -->
+                    <div class="tab-pane fade show active" id="videos-{{ student.id }}" role="tabpanel">
+                        <div class="row">
+                            {% for video in student.videos %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ video.title }}</h6>
+                                        <video class="w-100 mb-2" style="max-height: 200px;" controls>
+                                            <source src="{{ video.file_path }}" type="video/mp4">
+                                        </video>
+                                        <p class="card-text small text-muted">
+                                            Created: {{ video.created_at.strftime('%Y-%m-%d') }}<br>
+                                            Type: {{ video.form_type }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Rhythms Tab -->
+                    <div class="tab-pane fade" id="rhythms-{{ student.id }}" role="tabpanel">
+                        <div class="row">
+                            {% for rhythm in student.rhythms %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ rhythm.title }}</h6>
+                                        <p class="card-text">
+                                            BPM: {{ rhythm.bpm }}<br>
+                                            Markers: {{ rhythm.markers|length }}<br>
+                                            Created: {{ rhythm.created_at.strftime('%Y-%m-%d') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% block extra_js %}
+<script>
+function copyClassCode() {
+    const classCode = "{{ current_user.class_code }}";
+    navigator.clipboard.writeText(classCode).then(() => {
+        alert('Class code copied to clipboard!');
+    });
+}
+
+// Initialize all modals
+document.addEventListener('DOMContentLoaded', function() {
+    var modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        new bootstrap.Modal(modal);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 

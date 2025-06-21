@@ -1,16 +1,14 @@
 import os
 import os.path
 import subprocess
-import time
 import math
 from datetime import datetime
 from functools import wraps
 
 import cv2
-from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_file, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
@@ -19,7 +17,7 @@ from PracticeStudio import PracticeStudio
 from capture import Capture
 from utils.form_utils.form_comparison import FormComparison
 from utils.form_utils.form_analyzer import FormAnalyzer
-from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, PracticeVideo, VideoFavorite
+from models import db, LibraryItem, User, Progress, UserActivity, Message, VideoComment, CustomEvent, Role, PracticeVideo, VideoFavorite
 from white_belt_form import WhiteBeltForm
 
 app = Flask(__name__)
@@ -49,9 +47,9 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-camera = None
-practice_studio = None
-white_belt_form = None
+camera: Capture
+practice_studio: PracticeStudio
+white_belt_form: WhiteBeltForm
 
 def init_camera():
     global camera, practice_studio
@@ -106,19 +104,63 @@ def generate_frames():
 def landing():
     return render_template('landing.html')
 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        # Check if username already exists
+        if User.query.filter_by(username=request.form['username']).first():
+            flash('Username already exists. Please choose a different one.')
+            return render_template('signup.html')
+
+        # Check if email already exists
+        if User.query.filter_by(email=request.form['email']).first():
+            flash('Email already registered. Please use a different email or login.')
+            return render_template('signup.html')
+
+        # Verify class code
+        class_code = request.form.get('class_code')
+        master = User.query.filter_by(
+            class_code=class_code,
+            role=Role.MASTER
+        ).first()
+        if not master:
+            flash('Invalid class code. Please check with your instructor.')
+            return render_template('signup.html')
+
+        try:
+            hashed_password = generate_password_hash(request.form['password'])
+            new_user = User(
+                username=request.form['username'],
+                email=request.form['email'],
+                password_hash=hashed_password,
+                belt_rank=request.form.get('belt_rank', 'White'),
+                teacher_id=master.id
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Account created successfully! Please login.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            print(e)
+            flash('An error occurred while creating your account. Please try again.')
+            return render_template('signup.html')
+
+    return render_template('signup.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     # Debug: Print all users in database
     print("\n=== Current Users in Database ===")
     all_users = User.query.all()
     for user in all_users:
-        print(f"Username: {user.username}, Email: {user.email}, Is Admin: {user.is_admin}")
+        print(f"Username: {user.username}, Email: {user.email}, Is Master: {user.is_master}, Is Admin: {user.is_admin}")
     print("===============================\n")
 
     # If user is already logged in, redirect to appropriate dashboard
     if current_user.is_authenticated:
-        if current_user.is_administrator():
-            return redirect(url_for('admin_dashboard'))
+        if current_user.is_master():
+            return redirect(url_for('master_dashboard'))
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
@@ -132,6 +174,7 @@ def login():
 
         if user:
             print(f"User found: {user.username}, is_admin: {user.is_admin}")  # Debug log
+            print(f"User found: {user.username}, is_master: {user.is_master}")  # Debug log
 
             # Verify password
             if check_password_hash(user.password_hash, password):
@@ -167,10 +210,11 @@ def login():
 
                 # Determine where to redirect
                 next_page = request.args.get('next')
+                print(next_page)
                 if not next_page or not next_page.startswith('/'):
-                    if user.is_administrator():
-                        print(f"Redirecting admin user {username} to admin dashboard")  # Debug log
-                        next_page = url_for('admin_dashboard')
+                    if user.is_master():
+                        print(f"Redirecting master user {username} to master dashboard")  # Debug log
+                        next_page = url_for('master_dashboard')
                     else:
                         print(f"Redirecting regular user {username} to user dashboard")  # Debug log
                         next_page = url_for('dashboard')
@@ -188,44 +232,39 @@ def login():
 
     return render_template('login.html')
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
+
+def admin_required(f: object) -> object:
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not (current_user.is_authenticated and current_user.is_admin()):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/create_master', methods=['GET','POST'])
+@login_required
+@admin_required
+def create_master():
+    if not current_user.is_admin():
+        flash("Only administrators may create master accounts.")
+        return redirect(url_for('dashboard'))
+
+
     if request.method == 'POST':
-        # Check if username already exists
-        if User.query.filter_by(username=request.form['username']).first():
-            flash('Username already exists. Please choose a different one.')
-            return render_template('signup.html')
+        # validate form…
+        user = User(
+            username=request.form.get('username'),
+            email=request.form.get('email'),
+            class_code=request.form.get('class_code'),
+            role=Role.MASTER
+        )
+        user.set_password(request.form.get('password'))
+        # generate that master's class_code
+        db.session.add(user)
+        db.session.commit()
+        flash("Master account created!")
 
-        # Check if email already exists
-        if User.query.filter_by(email=request.form['email']).first():
-            flash('Email already registered. Please use a different email or login.')
-            return render_template('signup.html')
-
-        # Verify class code
-        class_code = request.form.get('class_code')
-        admin_user = User.query.filter_by(class_code=class_code, is_admin=True).first()
-        if not admin_user:
-            flash('Invalid class code. Please check with your instructor.')
-            return render_template('signup.html')
-
-        try:
-            hashed_password = generate_password_hash(request.form['password'])
-            new_user = User(
-                username=request.form['username'],
-                email=request.form['email'],
-                password_hash=hashed_password,
-                belt_rank=request.form.get('belt_rank', 'White')
-            )
-            db.session.add(new_user)
-            db.session.commit()
-            flash('Account created successfully! Please login.')
-            return redirect(url_for('login'))
-        except Exception as e:
-            db.session.rollback()
-            flash('An error occurred while creating your account. Please try again.')
-            return render_template('signup.html')
-
-    return render_template('signup.html')
+    return render_template('admin/create_master.html')
 
 @app.route('/logout')
 @login_required
@@ -374,20 +413,20 @@ def dashboard():
 def practice():
     # Get all videos organized by tags
     all_videos = PracticeVideo.query.all()
-    
+
     # Get user's favorite videos
     user_favorites = VideoFavorite.query.filter_by(user_id=current_user.id).all()
     favorite_video_ids = [fav.video_id for fav in user_favorites]
-    
+
     # Organize videos by tags - be more inclusive
     sparring_videos = []
     poomsae_videos = []
     demo_videos = []
-    
+
     for video in all_videos:
         # Check if video is favorited by current user
         video.is_favorited = video.id in favorite_video_ids
-        
+
         if video.tags:
             if 'sparring' in video.tags:
                 sparring_videos.append(video)
@@ -401,10 +440,10 @@ def practice():
         else:
             # If no tags, add to sparring as default
             sparring_videos.append(video)
-    
+
     # Get favorite videos for display
     favorite_videos = [video for video in all_videos if video.id in favorite_video_ids]
-    
+
     # Get unique creators and their video counts
     creator_counts = {}
     for video in all_videos:
@@ -413,12 +452,12 @@ def practice():
                 if creator not in creator_counts:
                     creator_counts[creator] = 0
                 creator_counts[creator] += 1
-    
+
     # Debug output
     print(f"Debug - Total videos: {len(all_videos)}")
     print(f"Debug - Creator counts: {creator_counts}")
     print(f"Debug - User favorites: {len(favorite_videos)}")
-    
+
     return render_template('practice.html',
                          sparring_videos=sparring_videos,
                          poomsae_videos=poomsae_videos,
@@ -436,7 +475,7 @@ def practice_creator(creator_name):
     creator_videos = PracticeVideo.query.filter(
         PracticeVideo.creators.contains(creator_name)
     ).all()
-    
+
     return render_template('practice_creator.html',
                          creator_name=creator_name,
                          videos=creator_videos)
@@ -445,24 +484,24 @@ def practice_creator(creator_name):
 @login_required
 def practice_video_detail(video_id):
     video = PracticeVideo.query.get_or_404(video_id)
-    
+
     # Check if video is favorited by current user
     video.is_favorited = VideoFavorite.query.filter_by(
         user_id=current_user.id,
         video_id=video_id
     ).first() is not None
-    
+
     # Increment view count
     video.views += 1
     db.session.commit()
-    
+
     # Get related videos (same tags or creators)
     # Use a simpler approach for SQLite JSON fields
     related_videos = []
     if video.tags or video.creators:
         # Get all videos except the current one
         all_videos = PracticeVideo.query.filter(PracticeVideo.id != video_id).all()
-        
+
         for other_video in all_videos:
             # Check for tag overlap
             tag_overlap = False
@@ -471,7 +510,7 @@ def practice_video_detail(video_id):
                     if tag in other_video.tags:
                         tag_overlap = True
                         break
-            
+
             # Check for creator overlap
             creator_overlap = False
             if video.creators and other_video.creators:
@@ -479,12 +518,12 @@ def practice_video_detail(video_id):
                     if creator in other_video.creators:
                         creator_overlap = True
                         break
-            
+
             if tag_overlap or creator_overlap:
                 related_videos.append(other_video)
                 if len(related_videos) >= 6:  # Limit to 6 related videos
                     break
-    
+
     return render_template('practice_video_detail.html',
                          video=video,
                          related_videos=related_videos)
@@ -902,68 +941,74 @@ def serve_upload(filename):
         print(f"Error serving file: {str(e)}")  # Debug log
         return str(e), 500
 
-# Add admin required decorator
-def admin_required(f):
+# Add master required decorator
+def master_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_administrator():
+        if not current_user.is_authenticated or not current_user.is_master():
             flash('You do not have permission to access this page.')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
-# Add admin routes
-@app.route('/admin')
+# Add master routes
+@app.route('/master')
 @login_required
-@admin_required
-def admin_dashboard():
-    # Get all users except admins
-    users = User.query.filter_by(is_admin=False).all()
-    return render_template('admin/dashboard.html', users=users)
+@master_required
+def master_dashboard():
+    # Get all master's students
+    students = User.query.filter_by(
+        class_code=current_user.class_code,
+        role=Role.STUDENT
+    ).all()
+    return render_template('master/dashboard.html', students=students)
 
-@app.route('/admin/users')
+@app.route('/master/users')
 @login_required
-@admin_required
-def admin_users():
-    users = User.query.filter_by(is_admin=False).all()
-    return render_template('admin/users.html', users=users)
+@master_required
+def master_users():
+    students = User.query.filter_by(
+        class_code=current_user.class_code,
+        role=Role.STUDENT
+    ).all()
+    return render_template('master/users.html', students=students)
 
-@app.route('/admin/user/<int:user_id>')
+@app.route('/master/user/<int:user_id>')
 @login_required
-@admin_required
-def admin_user_detail(user_id):
+@master_required
+def master_user_detail(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot view admin user details.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot view master user details.')
+        return redirect(url_for('master_users'))
 
-    # Get message history between admin and student
+    # Get message history between master and student
     messages = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == user.id)) |
         ((Message.sender_id == user.id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.created_at.desc()).all()
 
-    return render_template('admin/user_detail.html', user=user, messages=messages)
+    return render_template('master/user_detail.html', user=user, messages=messages)
 
-@app.route('/admin/user/<int:user_id>/progress')
+@app.route('/master/user/<int:user_id>/progress')
 @login_required
-@admin_required
-def admin_user_progress(user_id):
+@master_required
+def master_user_progress(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot view admin user progress.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot view master user progress.')
+        return redirect(url_for('master_users'))
     progress_data = Progress.query.filter_by(user_id=user.id).all()
-    return render_template('admin/user_progress.html', user=user, progress_data=progress_data)
+    return render_template('master/user_progress.html', user=user, progress_data=progress_data)
 
-@app.route('/admin/user/<int:user_id>/update-belt', methods=['POST'])
+@app.route('/master/user/<int:user_id>/update-belt', methods=['POST'])
 @login_required
-@admin_required
-def admin_update_belt(user_id):
+@master_required
+def master_update_belt(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot modify admin user.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot modify master user.')
+        return redirect(url_for('master_users'))
 
     new_belt = request.form.get('belt_rank')
     if new_belt in ['White', 'Yellow', 'Green', 'Blue', 'Red', 'Black']:
@@ -973,21 +1018,21 @@ def admin_update_belt(user_id):
     else:
         flash('Invalid belt rank.')
 
-    return redirect(url_for('admin_user_detail', user_id=user_id))
+    return redirect(url_for('master_user_detail', user_id=user_id))
 
-@app.route('/admin/user/<int:user_id>/send-message', methods=['POST'])
+@app.route('/master/user/<int:user_id>/send-message', methods=['POST'])
 @login_required
-@admin_required
-def admin_send_message(user_id):
+@master_required
+def master_send_message(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot send message to admin user.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot send message to master user.')
+        return redirect(url_for('master_users'))
 
     content = request.form.get('message')
     if not content:
         flash('Message cannot be empty.')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('master_dashboard'))
 
     # Create new message
     message = Message(
@@ -1000,16 +1045,16 @@ def admin_send_message(user_id):
     db.session.commit()
 
     flash('Message sent successfully.')
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('master_dashboard'))
 
-@app.route('/admin/user/<int:user_id>/download-csv')
+@app.route('/master/user/<int:user_id>/download-csv')
 @login_required
-@admin_required
-def admin_download_csv(user_id):
+@master_required
+def master_download_csv(user_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot download admin data.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot download master data.')
+        return redirect(url_for('master_users'))
 
     # Create CSV data
     import csv
@@ -1039,59 +1084,59 @@ def admin_download_csv(user_id):
         }
     )
 
-# Add route to create first admin user
-@app.route('/create-admin', methods=['GET', 'POST'])
-def create_admin():
-    # Check if any admin exists
-    if User.query.filter_by(is_admin=True).first():
-        flash('Admin user already exists.')
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-
-        print(f"Attempting to create admin account for username: {username}")  # Debug log
-
-        if User.query.filter_by(username=username).first():
-            print(f"Username {username} already exists")  # Debug log
-            flash('Username already exists.')
-            return render_template('create_admin.html')
-
-        if User.query.filter_by(email=email).first():
-            print(f"Email {email} already registered")  # Debug log
-            flash('Email already registered.')
-            return render_template('create_admin.html')
-
-        try:
-            # Create admin user first
-            admin_user = User(
-                username=username,
-                email=email,
-                password_hash=generate_password_hash(password),
-                is_admin=True,
-                created_at=datetime.now()
-            )
-
-            # Generate and set class code
-            class_code = admin_user.generate_class_code()
-            print(f"Generated class code: {class_code}")  # Debug log
-
-            # Add to session and commit
-            db.session.add(admin_user)
-            db.session.commit()
-
-            print(f"Successfully created admin account for {username} with class code {class_code}")  # Debug log
-            flash('Admin account created successfully! Please login.')
-            return redirect(url_for('login'))
-        except Exception as e:
-            print(f"Error creating admin account: {str(e)}")  # Debug log
-            db.session.rollback()
-            flash('An error occurred while creating the admin account.')
-            return render_template('create_admin.html')
-
-    return render_template('create_admin.html')
+# Add route to create first master user
+# @app.route('/create-master', methods=['GET', 'POST'])
+# def create_master(): # COME BACK TO
+#     # Check if any master exists
+#     if User.query.filter_by(is_master=True).first():
+#         flash('Admin user already exists.')
+#         return redirect(url_for('login'))
+#
+#     if request.method == 'POST':
+#         username = request.form.get('username')
+#         email = request.form.get('email')
+#         password = request.form.get('password')
+#
+#         print(f"Attempting to create master account for username: {username}")  # Debug log
+#
+#         if User.query.filter_by(username=username).first():
+#             print(f"Username {username} already exists")  # Debug log
+#             flash('Username already exists.')
+#             return render_template('create_admin.html')
+#
+#         if User.query.filter_by(email=email).first():
+#             print(f"Email {email} already registered")  # Debug log
+#             flash('Email already registered.')
+#             return render_template('create_admin.html')
+#
+#         try:
+#             # Create master user first
+#             admin_user = User(
+#                 username=username,
+#                 email=email,
+#                 password_hash=generate_password_hash(password),
+#                 is_admin=True,
+#                 created_at=datetime.now()
+#             )
+#
+#             # Generate and set class code
+#             class_code = admin_user.generate_class_code()
+#             print(f"Generated class code: {class_code}")  # Debug log
+#
+#             # Add to session and commit
+#             db.session.add(admin_user)
+#             db.session.commit()
+#
+#             print(f"Successfully created master account for {username} with class code {class_code}")  # Debug log
+#             flash('Admin account created successfully! Please log in.')
+#             return redirect(url_for('login'))
+#         except Exception as e:
+#             print(f"Error creating master account: {str(e)}")  # Debug log
+#             db.session.rollback()
+#             flash('An error occurred while creating the master account.')
+#             return render_template('create_admin.html')
+#
+#     return render_template('create_admin.html')
 
 @app.route('/messages')
 @login_required
@@ -1118,8 +1163,11 @@ def send_message():
         flash('Message cannot be empty.')
         return redirect(url_for('messages'))
 
-    # Find the instructor (admin) for this user
-    instructor = User.query.filter_by(is_admin=True).first()
+    # Find the instructor (master) for this user
+    instructor = User.query.filter_by(
+        role=Role.MASTER,
+        class_code=current_user.class_code
+    ).first()
     if not instructor:
         flash('No instructor found.')
         return redirect(url_for('messages'))
@@ -1147,32 +1195,35 @@ def inject_unread_messages():
         return {'unread_messages': unread_count}
     return {'unread_messages': 0}
 
-@app.route('/admin/messages')
-@app.route('/admin/messages/<int:user_id>')
+@app.route('/master/messages')
+@app.route('/master/messages/<int:user_id>')
 @login_required
-@admin_required
-def admin_messages(user_id=None):
+@master_required
+def master_messages(user_id=None):
     # Debug: Print current user info
-    print(f"Current user: {current_user.username}, is_admin: {current_user.is_admin}")
+    print(f"Current user: {current_user.username}, is_master: {current_user.is_master}")
 
-    # Get all non-admin users
-    users = User.query.filter_by(is_admin=False).order_by(User.username).all()
-    print(f"Found {len(users)} non-admin users")
-    for user in users:
-        print(f"User: {user.username}, is_admin: {user.is_admin}")
+    # Get all non-master users
+    students = User.query.filter_by(
+        role=Role.STUDENT,
+        class_code=current_user.class_code
+    ).order_by(User.username).all()
+    print(f"Found {len(students)} non-master users")
+    for student in students:
+        print(f"User: {student.username}, is_master: {student.is_master}")
 
     selected_user = None
     messages = []
 
     if user_id:
         selected_user = User.query.get_or_404(user_id)
-        print(f"Selected user: {selected_user.username}, is_admin: {selected_user.is_admin}")
+        print(f"Selected user: {selected_user.username}, is_master: {selected_user.is_master}")
 
-        if selected_user.is_admin:
-            flash('Cannot view admin user messages.')
-            return redirect(url_for('admin_messages'))
+        if selected_user.is_master:
+            flash('Cannot view master user messages.')
+            return redirect(url_for('master_messages'))
 
-        # Get message history between admin and selected user
+        # Get message history between master and selected user
         messages = Message.query.filter(
             ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id)) |
             ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
@@ -1185,22 +1236,25 @@ def admin_messages(user_id=None):
                 message.is_read = True
         db.session.commit()
 
-    return render_template('admin/messages.html',
-                         users=users,
-                         selected_user=selected_user,
-                         messages=messages)
+    return render_template('master/messages.html',
+                           users=students,
+                           selected_user=selected_user,
+                           messages=messages)
 
-@app.route('/admin/send-announcement', methods=['POST'])
+@app.route('/master/send-announcement', methods=['POST'])
 @login_required
-@admin_required
-def admin_send_announcement():
+@master_required
+def master_send_announcement():
     content = request.form.get('message')
     if not content:
         flash('Announcement cannot be empty.')
-        return redirect(url_for('admin_messages'))
+        return redirect(url_for('master_messages'))
 
-    # Get all non-admin users
-    students = User.query.filter_by(is_admin=False).all()
+    # Get master's students
+    students = User.query.filter_by(
+        role=Role.STUDENT,
+        class_code=current_user.class_code
+    ).order_by(User.username).all()
 
     # Create a message for each student
     for student in students:
@@ -1213,33 +1267,33 @@ def admin_send_announcement():
 
     db.session.commit()
     flash('Announcement sent to all students.')
-    return redirect(url_for('admin_messages'))
+    return redirect(url_for('master_messages'))
 
-@app.route('/admin/user/<int:user_id>/video/<int:video_id>')
+@app.route('/master/user/<int:user_id>/video/<int:video_id>')
 @login_required
-@admin_required
-def admin_view_student_video(user_id, video_id):
+@master_required
+def master_view_student_video(user_id, video_id):
     user = User.query.get_or_404(user_id)
-    if user.is_admin:
-        flash('Cannot view admin user videos.')
-        return redirect(url_for('admin_users'))
+    if user.is_master:
+        flash('Cannot view master user videos.')
+        return redirect(url_for('master_users'))
     
     video = LibraryItem.query.get_or_404(video_id)
     if video.item_type != 'video':
         flash('This item is not a video.')
-        return redirect(url_for('admin_users'))
+        return redirect(url_for('master_users'))
     
     # Get existing comments for this video
     comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
     
-    return render_template('admin/view_student_video.html', 
-                         user=user, 
-                         video=video, 
-                         comments=comments)
+    return render_template('master/view_student_video.html',
+                           user=user,
+                           video=video,
+                           comments=comments)
 
 @app.route('/api/video/<int:video_id>/comments', methods=['GET'])
 @login_required
-@admin_required
+@master_required
 def get_video_comments(video_id):
     """Get all comments for a video"""
     comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.timestamp).all()
@@ -1248,7 +1302,7 @@ def get_video_comments(video_id):
         'timestamp': comment.timestamp,
         'comment': comment.comment,
         'created_at': comment.created_at.isoformat(),
-        'admin_name': comment.admin.username,
+        'master_name': comment.master.username,
         'has_annotation': comment.has_annotation,
         'annotation': {
             'x': comment.annotation_x,
@@ -1260,7 +1314,7 @@ def get_video_comments(video_id):
 
 @app.route('/api/video/<int:video_id>/comments', methods=['POST'])
 @login_required
-@admin_required
+@master_required
 def add_video_comment(video_id):
     """Add a new comment to a video"""
     data = request.get_json()
@@ -1277,13 +1331,13 @@ def add_video_comment(video_id):
         return jsonify({'error': 'Item is not a video'}), 400
     
     student = User.query.get(video.user_id)
-    if student.is_admin:
-        return jsonify({'error': 'Cannot comment on admin videos'}), 400
+    if student.is_master:
+        return jsonify({'error': 'Cannot comment on master videos'}), 400
     
     # Create the comment
     new_comment = VideoComment(
         video_id=video_id,
-        admin_id=current_user.id,
+        master_id=current_user.id,
         timestamp=timestamp,
         comment=comment_text
     )
@@ -1304,7 +1358,7 @@ def add_video_comment(video_id):
         'timestamp': new_comment.timestamp,
         'comment': new_comment.comment,
         'created_at': new_comment.created_at.isoformat(),
-        'admin_name': current_user.username,
+        'master_name': current_user.username,
         'has_annotation': new_comment.has_annotation,
         'annotation': {
             'x': new_comment.annotation_x,
@@ -1316,12 +1370,12 @@ def add_video_comment(video_id):
 
 @app.route('/api/comment/<int:comment_id>', methods=['DELETE'])
 @login_required
-@admin_required
+@master_required
 def delete_video_comment(comment_id):
-    """Delete a video comment (only by the admin who created it)"""
+    """Delete a video comment (only by the master who created it)"""
     comment = VideoComment.query.get_or_404(comment_id)
     
-    if comment.admin_id != current_user.id:
+    if comment.master_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
     
     db.session.delete(comment)
@@ -1342,19 +1396,22 @@ def view_my_video(video_id):
     return render_template('view_my_video.html', video=video)
 
 # Calendar Management Routes
-@app.route('/admin/calendar')
+@app.route('/master/calendar')
 @login_required
-@admin_required
-def admin_calendar():
-    """Admin calendar management page"""
+@master_required
+def master_calendar():
+    """master calendar management page"""
     events = CustomEvent.query.order_by(CustomEvent.event_date).all()
-    students = User.query.filter_by(is_admin=False).order_by(User.username).all()
-    return render_template('admin/calendar.html', events=events, students=students)
+    students = User.query.filter_by(
+        class_code=current_user.class_code,
+        role=Role.STUDENT
+    ).order_by(User.username).all()
+    return render_template('master/calendar.html', events=events, students=students)
 
-@app.route('/admin/calendar/add', methods=['POST'])
+@app.route('/master/calendar/add', methods=['POST'])
 @login_required
-@admin_required
-def admin_add_event():
+@master_required
+def master_add_event():
     """Add a new calendar event"""
     try:
         title = request.form.get('title')
@@ -1396,12 +1453,12 @@ def admin_add_event():
         flash(f'Error adding event: {str(e)}', 'error')
         db.session.rollback()
     
-    return redirect(url_for('admin_calendar'))
+    return redirect(url_for('master_calendar'))
 
-@app.route('/admin/calendar/edit/<int:event_id>', methods=['POST'])
+@app.route('/master/calendar/edit/<int:event_id>', methods=['POST'])
 @login_required
-@admin_required
-def admin_edit_event(event_id):
+@master_required
+def master_edit_event(event_id):
     """Edit an existing calendar event"""
     event = CustomEvent.query.get_or_404(event_id)
     
@@ -1434,12 +1491,12 @@ def admin_edit_event(event_id):
         flash(f'Error updating event: {str(e)}', 'error')
         db.session.rollback()
     
-    return redirect(url_for('admin_calendar'))
+    return redirect(url_for('master_calendar'))
 
-@app.route('/admin/calendar/delete/<int:event_id>', methods=['POST'])
+@app.route('/master/calendar/delete/<int:event_id>', methods=['POST'])
 @login_required
-@admin_required
-def admin_delete_event(event_id):
+@master_required
+def master_delete_event(event_id):
     """Delete a calendar event"""
     event = CustomEvent.query.get_or_404(event_id)
     
@@ -1451,7 +1508,7 @@ def admin_delete_event(event_id):
         flash(f'Error deleting event: {str(e)}', 'error')
         db.session.rollback()
     
-    return redirect(url_for('admin_calendar'))
+    return redirect(url_for('master_calendar'))
 
 @app.route('/get_custom_events')
 @login_required
@@ -1491,13 +1548,13 @@ def toggle_video_favorite(video_id):
     try:
         # Check if video exists
         video = PracticeVideo.query.get_or_404(video_id)
-        
+
         # Check if already favorited
         existing_favorite = VideoFavorite.query.filter_by(
             user_id=current_user.id,
             video_id=video_id
         ).first()
-        
+
         if existing_favorite:
             # Remove from favorites
             db.session.delete(existing_favorite)
@@ -1520,7 +1577,7 @@ def toggle_video_favorite(video_id):
                 'favorited': True,
                 'message': 'Added to favorites'
             })
-            
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -1528,7 +1585,32 @@ def toggle_video_favorite(video_id):
             'error': str(e)
         }), 500
 
+import click
+
+@app.cli.command("create-admin")
+@click.argument("username")
+@click.argument("email")
+@click.argument("password")
+def create_admin(username, email, password):
+    """Create an ADMIN user with a custom class code."""
+    if User.query.filter_by(username=username).first():
+        print(f"⚠️  username '{username}' already exists.")
+        return
+
+    admin = User(
+        username=username,
+        email=email,
+        role=Role.ADMIN,
+    )
+    admin.set_password(password)
+    db.session.add(admin)
+    db.session.commit()
+    print(f"✅ Created ADMIN {username!r}")
+
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5002))
     app.run(host="0.0.0.0", port=port)
+
+
