@@ -759,14 +759,22 @@ def process_form_comparison():
         )
 
         # Calculate average score and convert to percentage
-        avg_score = np.mean([fv['overall_score'] for fv in feature_vectors])
-        score_percentage = round(avg_score * 100, 1)
-
-        # Calculate stars earned (1-5)
-        stars_earned = math.ceil((score_percentage / 100) * 5) - 1
-
-        # Ensure minimum of 1 star
-        stars_earned = max(1, stars_earned)
+        if not feature_vectors:
+            # No valid poses detected
+            score_percentage = 0.0
+            stars_earned = 1  # Minimum 1 star for attempting
+        else:
+            avg_score = np.mean([fv['overall_score'] for fv in feature_vectors])
+            # Check for NaN or invalid scores
+            if np.isnan(avg_score) or avg_score < 0:
+                score_percentage = 0.0
+                stars_earned = 1  # Minimum 1 star for attempting
+            else:
+                score_percentage = round(avg_score * 100, 1)
+                # Calculate stars earned (1-5)
+                stars_earned = math.ceil((score_percentage / 100) * 5) - 1
+                # Ensure minimum of 1 star
+                stars_earned = max(1, stars_earned)
 
         # Update user's star count
         current_user.star_count += stars_earned
