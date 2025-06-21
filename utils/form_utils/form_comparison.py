@@ -260,7 +260,7 @@ class FormComparison:
             DOWNSAMPLE = (width, height)
             FRAME_SKIP = 2
 
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')
             temp_out = str(output_path) + ".novid.mp4"
             out = cv2.VideoWriter(temp_out, fourcc, fps / (FRAME_SKIP + 1), DOWNSAMPLE)
 
