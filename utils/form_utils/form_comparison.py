@@ -258,7 +258,7 @@ class FormComparison:
             SELECTED_ANGLES = ['left_knee', 'right_knee', 'left_elbow', 'right_elbow']
 
             DOWNSAMPLE = (width, height)
-            FRAME_SKIP = 2
+            FRAME_SKIP = 0
 
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             temp_out = str(output_path) + ".novid.mp4"
