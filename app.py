@@ -917,13 +917,19 @@ def get_user_activity():
     try:
         # Get custom events that are relevant to the current user
         # Events sent to all students OR events specifically targeting this user
+        # Fix PostgreSQL JSON field query - use a simpler approach
         custom_events = CustomEvent.query.filter(
-            (CustomEvent.send_to_all == True) | 
-            (CustomEvent.target_students.contains([current_user.id]))
+            CustomEvent.send_to_all == True
         ).order_by(CustomEvent.event_date).all()
         
-        events = []
+        # Filter target_students in Python instead of SQL to avoid JSON operator issues
+        filtered_custom_events = []
         for event in custom_events:
+            if event.send_to_all or (event.target_students and current_user.id in event.target_students):
+                filtered_custom_events.append(event)
+        
+        events = []
+        for event in filtered_custom_events:
             event_data = {
                 'id': f'custom_{event.id}',
                 'title': event.title,
