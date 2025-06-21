@@ -4,11 +4,33 @@ import numpy as np
 import json
 import os
 from pathlib import Path
+import subprocess
 import time
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeVideoClip, ImageSequenceClip
 from mediapipe.framework.formats import landmark_pb2
 from utils.form_utils.metrics import joint_errors, angle_errors, build_feature_vector
 from flask import current_app
+
+_mp_pose = mp.solutions.pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+
+_ideal_cache = None
+
+def _load_ideal(path):
+    global _ideal_cache
+    if _ideal_cache is None:
+        raw = json.load(open(path))
+        _ideal_cache = {
+           'pose_data': raw['pose_data'],
+           'timestamps': np.array([f['timestamp'] for f in raw['pose_data']]),
+           'landmarks': np.array([
+               [[lm['x'],lm['y'],lm['z'],lm['visibility']] for lm in f['landmarks']]
+               for f in raw['pose_data']
+           ])
+        }
+    return _ideal_cache
+
+
 
 class FormComparison:
     def __init__(self, ideal_data_path=None):
@@ -22,15 +44,7 @@ class FormComparison:
         print("Ideal pose data loaded successfully")
         
         # Initialize other attributes
-        self.mp_pose = None
-        self.mp_drawing = None
-        self.pose = None
-        
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
+        self.pose = _mp_pose
         self.mp_drawing = mp.solutions.drawing_utils
         
         # Drawing specifications
@@ -180,7 +194,7 @@ class FormComparison:
                     continue
             
             # Draw connections
-            for connection in self.mp_pose.POSE_CONNECTIONS:
+            for connection in mp.solutions.pose.POSE_CONNECTIONS:
                 try:
                     start_idx = connection[0]
                     end_idx = connection[1]
@@ -243,10 +257,23 @@ class FormComparison:
             SELECTED_JOINTS = ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip', 'left_knee', 'right_knee']
             SELECTED_ANGLES = ['left_knee', 'right_knee', 'left_elbow', 'right_elbow']
 
+            DOWNSAMPLE = (width, height)
+            FRAME_SKIP = 2
+
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            temp_out = str(output_path) + ".novid.mp4"
+            out = cv2.VideoWriter(temp_out, fourcc, fps / (FRAME_SKIP + 1), DOWNSAMPLE)
+
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     break
+
+                if frame_count % (FRAME_SKIP + 1) != 0:
+                    frame_count += 1
+                    continue
+
+                frame = cv2.resize(frame, DOWNSAMPLE, interpolation=cv2.INTER_LINEAR)
                 
                 # Process frame with MediaPipe
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -275,7 +302,7 @@ class FormComparison:
                         self.mp_drawing.draw_landmarks(
                             frame,
                             results.pose_landmarks,
-                            self.mp_pose.POSE_CONNECTIONS,
+                            mp.solutions.pose.POSE_CONNECTIONS,
                             self.user_drawing_spec
                         )
 
@@ -292,7 +319,7 @@ class FormComparison:
                         self.mp_drawing.draw_landmarks(
                             frame,
                             ideal_landmarks_mp,
-                            self.mp_pose.POSE_CONNECTIONS,
+                            mp.solutions.pose.POSE_CONNECTIONS,
                             self.ideal_drawing_spec
                         )
 
@@ -315,9 +342,11 @@ class FormComparison:
                 cv2.putText(frame, f"Frame: {frame_count}", (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                 
-                # Convert frame to RGB for MoviePy
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                processed_frames.append(frame_rgb)
+                # # Convert frame to RGB for MoviePy
+                # frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # processed_frames.append(frame_rgb)
+
+                out.write(frame)  # write BGR directly
                 
                 frame_count += 1
                 
@@ -326,47 +355,43 @@ class FormComparison:
                     progress = (frame_count / total_frames) * 100
                     print(f"Progress: {progress:.1f}% ({frame_count}/{total_frames} frames)")
             
-            cap.release()
-            
             print(f"Processed {frame_count} frames")
-            
-            if not processed_frames:
-                print("No frames were processed successfully")
-                return None, []
-            
-            # Create video from processed frames
-            print("Creating video from processed frames...")
-            clip = ImageSequenceClip(processed_frames, fps=fps)
+
+            cap.release()
+            out.release()
+
+            temp_vid_path = output_path + ".novid.mp4"
+            final_vid_path = output_path
+
+            print(f"✅ Wrote raw video frames to {temp_out}")
+
+
             
             # Add audio if provided
-            if audio_path and Path(audio_path).exists():
-                print("🎵 Adding audio track...")
-                audio = AudioFileClip(audio_path)
-                
-                # Trim audio to match video length if needed
-                if audio.duration > clip.duration:
-                    audio = audio.subclip(0, clip.duration)
-                
-                # Combine video and audio
-                clip = clip.set_audio(audio)
-            
-            # Write the final video
-            print("Writing final video...")
-            clip.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac' if audio_path else None
-            )
-            
-            # Clean up
-            clip.close()
-            if audio_path and Path(audio_path).exists():
-                audio.close()
-            
+            if audio_path:
+                audio_file = Path(audio_path)
+                if audio_file.exists():
+                    final = str(output_path)
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', temp_out,
+                        '-i', str(audio_file),
+                        '-c:v', 'copy',
+                        '-c:a', 'aac',
+                        '-b:a', '128k',
+                        '-shortest',
+                        final
+                    ]
+                    subprocess.run(cmd, check=True)
+                    os.remove(temp_out)
+                    print(f"✅ Final video with audio at {final}")
+                    return final, all_feature_vectors
+
             print(f"✅ Comparison video saved to {output_path}")
-            print(all_feature_vectors[:3])
-            return output_path, all_feature_vectors
-            
+
+            os.rename(temp_out, str(output_path))
+            return str(output_path), all_feature_vectors
+
         except Exception as e:
             print(f"Error processing video: {str(e)}")
             return None, []

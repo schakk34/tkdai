@@ -756,11 +756,17 @@ def process_form_comparison():
             
             # Add timeout and memory optimization for form comparison
             try:
-                result_video_path, feature_vectors = form_comparison.process_user_video(
+                result = form_comparison.process_user_video(
                     user_video_path=mp4_path,
                     output_path=os.path.join(user_upload_dir, f"{form_type}_comparison_{timestamp}.mp4"),
-                    audio_path=rhythm_path
-                )
+                    audio_path=rhythm_path)
+                if result is None or result[0] is None:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Video processing failed; see server logs for details.'
+                    }), 500
+
+                result_video_path, feature_vectors = result
             except Exception as e:
                 print(f"Form comparison processing error: {e}")
                 # Return a basic response if form comparison fails
