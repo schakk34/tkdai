@@ -441,21 +441,13 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             body: formData
         });
 
+        const data = await response.json();
+        console.log('Form comparison response:', data); // Debug log
+        
         if (!response.ok) {
-            // Try to parse JSON error, or fallback to text
-            let err;
-            try {
-                const errData = await response.json();
-                err = errData.error || 'Upload failed';
-            } catch {
-                err = await response.text();
-            }
-            alert(err);
+            alert(data.error || 'Upload failed');
             return;
         }
-        
-        const data = await response.json();
-        console.log(data)
         
         if (data.success) {
             const resultVideo = document.getElementById('resultVideo');
@@ -507,7 +499,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             alert(data.error || 'Failed to process video');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in form comparison:', error);
         alert('An error occurred while processing the video');
     } finally {
         submitButton.disabled = false;
