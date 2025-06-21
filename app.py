@@ -750,16 +750,7 @@ def process_form_comparison():
         if not os.path.exists(ideal_data_path):
             return jsonify({'error': f'No ideal data found for {form_type}'}), 400
 
-        # Process the video with timeout
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Form comparison timed out")
-        
-        # Set timeout for form comparison (3 minutes)
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(180)  # 3 minutes timeout
-        
+        # Process the video with error handling
         try:
             form_comparison = FormComparison(ideal_data_path=ideal_data_path)
             
@@ -783,9 +774,9 @@ def process_form_comparison():
                     'mp4_path': mp4_path,
                     'message': 'Video processed but form comparison failed. You can still save to library.'
                 })
-        except TimeoutError:
-            print("Form comparison timed out")
-            signal.alarm(0)  # Cancel the alarm
+        except Exception as e:
+            print(f"Form comparison processing error: {e}")
+            # Return a basic response if form comparison fails
             return jsonify({
                 'success': True,
                 'video_url': url_for('static', filename=f'uploads/{current_user.id}/{mp4_filename}'),
@@ -794,10 +785,8 @@ def process_form_comparison():
                 'total_stars': current_user.star_count,
                 'all_feature_vectors': [],
                 'mp4_path': mp4_path,
-                'message': 'Video processed but form comparison timed out. You can still save to library.'
+                'message': 'Video processed but form comparison failed. You can still save to library.'
             })
-        finally:
-            signal.alarm(0)  # Cancel the alarm
 
         # Calculate average score and convert to percentage
         if not feature_vectors:
