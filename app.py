@@ -402,12 +402,16 @@ def dashboard():
     # Get both WT calendar events and custom events relevant to this user
     wt_events = get_wt_calendar_events()
     
-    # Fix PostgreSQL JSON field query
-    from sqlalchemy import text
+    # Fix PostgreSQL JSON field query - use a simpler approach
     custom_events = CustomEvent.query.filter(
-        (CustomEvent.send_to_all == True) | 
-        (text("custom_event.target_students @> :user_id"))
-    ).params(user_id=str([current_user.id])).order_by(CustomEvent.event_date).all()
+        CustomEvent.send_to_all == True
+    ).order_by(CustomEvent.event_date).all()
+    
+    # Filter target_students in Python instead of SQL to avoid JSON operator issues
+    filtered_custom_events = []
+    for event in custom_events:
+        if event.send_to_all or (event.target_students and current_user.id in event.target_students):
+            filtered_custom_events.append(event)
 
     # Get videos with comments for notifications
     videos_with_comments = []
@@ -425,7 +429,7 @@ def dashboard():
     return render_template('dashboard.html',
                          user=current_user,
                          wt_events=wt_events,
-                         custom_events=custom_events,
+                         custom_events=filtered_custom_events,
                          videos_with_comments=videos_with_comments)
 
 @app.route('/practice')
